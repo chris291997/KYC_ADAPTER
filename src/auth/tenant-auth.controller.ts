@@ -36,48 +36,6 @@ export class TenantAuthController {
     private readonly jwtService: JwtService,
   ) {}
 
-  @Post('debug')
-  @Public()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Debug Tenant Details',
-    description: 'Debug endpoint to check tenant details (development only)',
-  })
-  @ApiBody({
-    type: TenantLoginDto,
-    description: 'Tenant credentials to debug',
-  })
-  async debugTenant(@Body() loginDto: TenantLoginDto) {
-    // Find tenant by email
-    const tenant = await this.authService.findTenantByEmail(loginDto.email);
-
-    if (!tenant) {
-      return {
-        found: false,
-        message: 'Tenant not found',
-        email: loginDto.email,
-      };
-    }
-
-    // Check password
-    const isPasswordValid = await tenant.validatePassword(loginDto.password);
-
-    return {
-      found: true,
-      tenant: {
-        id: tenant.id,
-        email: tenant.email,
-        name: tenant.name,
-        status: tenant.status,
-        hasPassword: !!tenant.password,
-        passwordLength: tenant.password ? tenant.password.length : 0,
-        isActive: tenant.isActive(),
-        isPasswordValid: isPasswordValid,
-      },
-      message: isPasswordValid ? 'Password is valid' : 'Password is invalid',
-    };
-  }
-
   @Post('login')
   @Public()
   @HttpCode(HttpStatus.OK)

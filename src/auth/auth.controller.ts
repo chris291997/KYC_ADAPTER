@@ -224,4 +224,47 @@ export class AuthController {
       message: 'Logout successful',
     };
   }
+
+  @Post('debug')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Debug Admin Details',
+    description: 'Debug endpoint to check admin details (development only)',
+  })
+  @ApiBody({
+    type: LoginDto,
+    description: 'Admin credentials to debug',
+  })
+  async debugAdmin(@Body() loginDto: LoginDto) {
+    // Find admin by email
+    const admin = await this.adminAuthService.findAdminByEmail(loginDto.email);
+
+    if (!admin) {
+      return {
+        found: false,
+        message: 'Admin not found',
+        email: loginDto.email,
+      };
+    }
+
+    // Check password
+    const isPasswordValid = await admin.validatePassword(loginDto.password);
+
+    return {
+      found: true,
+      admin: {
+        id: admin.id,
+        email: admin.email,
+        name: admin.name,
+        role: admin.role,
+        status: admin.status,
+        hasPassword: !!admin.password,
+        passwordLength: admin.password ? admin.password.length : 0,
+        isActive: admin.isActive(),
+        isPasswordValid: isPasswordValid,
+      },
+      message: isPasswordValid ? 'Password is valid' : 'Password is invalid',
+    };
+  }
 }
