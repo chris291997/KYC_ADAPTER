@@ -36,7 +36,7 @@ import {
   ApiKeyCreatedResponseDto,
 } from './dto';
 
-@ApiTags('Tenant Management')
+@ApiTags('Admin - Tenant Management')
 @ApiBearerAuth('admin-auth')
 @ApiSecurity('admin-api-key')
 @ApiExtraModels(TenantResponseDto, ApiKeyResponseDto, ApiKeyCreatedResponseDto)

@@ -154,7 +154,6 @@ export class AdminAuthService {
       email,
       role,
       status: 'active',
-      settings: {},
     });
 
     const savedAdmin = await this.adminRepository.save(admin);

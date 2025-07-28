@@ -193,7 +193,8 @@ async function bootstrap() {
       .addServer('https://api.kyc-adapter.com', 'Production Server')
 
       // Tags for organization
-      .addTag('Tenant Management', 'Admin operations for managing tenants')
+      .addTag('Admin - Tenant Management', 'Admin operations for managing tenants')
+      .addTag('Tenant - Identity Verification', 'Tenant identity verification operations')
       .addTag('API Keys', 'API key management operations')
       .addTag('Future KYC', 'Planned KYC verification endpoints')
       .addTag('Authentication Tenant', 'Tenant authentication endpoints')

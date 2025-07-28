@@ -1,46 +1,91 @@
 import {
-  DocumentVerificationRequest,
-  DocumentVerificationResponse,
-} from './document-verification.interface';
-import {
-  BiometricVerificationRequest,
-  BiometricVerificationResponse,
-} from './biometric-verification.interface';
+  VerificationRequest,
+  VerificationResponse,
+  VerificationStatusResponse,
+  ProviderHealthResponse,
+  ProviderCredentials,
+  ProviderConfig,
+} from '../types/provider.types';
 
 /**
- * Main interface that all KYC providers must implement
- * This ensures a consistent API regardless of the underlying provider
+ * Interface that all KYC providers must implement
+ * Provides a unified API for different verification providers
  */
 export interface IKycProvider {
   /**
-   * Get the provider name (e.g., 'regula', 'persona')
+   * Provider name identifier
    */
-  getProviderName(): string;
+  readonly name: string;
 
   /**
-   * Check if the provider is available and configured correctly
+   * Provider type (regula, persona, etc.)
    */
-  isAvailable(): Promise<boolean>;
+  readonly type: string;
 
   /**
-   * Verify a document (passport, ID card, driver's license, etc.)
+   * Initialize the provider with credentials and configuration
+   * @param credentials Provider-specific API credentials
+   * @param config Provider configuration settings
    */
-  verifyDocument(request: DocumentVerificationRequest): Promise<DocumentVerificationResponse>;
+  initialize(credentials: ProviderCredentials, config?: ProviderConfig): Promise<void>;
 
   /**
-   * Verify biometric data (selfie matching, liveness detection)
+   * Create a new verification request
+   * Returns a one-time link for the user to complete verification
+   * @param request Verification request details
    */
-  verifyBiometric(request: BiometricVerificationRequest): Promise<BiometricVerificationResponse>;
+  createVerification(request: VerificationRequest): Promise<VerificationResponse>;
 
   /**
-   * Get provider-specific configuration requirements
+   * Get the current status of a verification
+   * @param providerVerificationId Provider's verification ID
    */
-  getConfigSchema(): Record<string, any>;
+  getVerificationStatus(providerVerificationId: string): Promise<VerificationStatusResponse>;
 
   /**
-   * Validate provider-specific configuration
+   * Cancel a pending verification
+   * @param providerVerificationId Provider's verification ID
    */
-  validateConfig(config: Record<string, any>): boolean;
+  cancelVerification(providerVerificationId: string): Promise<boolean>;
+
+  /**
+   * Handle webhook payload from the provider
+   * @param payload Raw webhook payload from provider
+   * @param signature Webhook signature for verification
+   */
+  handleWebhook(payload: any, signature?: string): Promise<VerificationStatusResponse | null>;
+
+  /**
+   * Check if the provider is healthy and responsive
+   */
+  healthCheck(): Promise<ProviderHealthResponse>;
+
+  /**
+   * Validate provider credentials
+   */
+  validateCredentials(): Promise<boolean>;
+}
+
+/**
+ * Factory interface for creating provider instances
+ */
+export interface IKycProviderFactory {
+  /**
+   * Create a provider instance
+   * @param type Provider type
+   * @param credentials Provider credentials
+   * @param config Provider configuration
+   */
+  createProvider(
+    type: string,
+    credentials: ProviderCredentials,
+    config?: ProviderConfig,
+  ): Promise<IKycProvider>;
+
+  /**
+   * Get list of supported provider types
+   */
+  getSupportedTypes(): string[];
 }
 
 /**

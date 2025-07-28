@@ -1,10 +1,17 @@
-import { Module } from '@nestjs/common';
-import { AllExceptionsFilter } from './filters/all-exceptions.filter';
-import { LoggingInterceptor } from './interceptors/logging.interceptor';
-import { TransformInterceptor } from './interceptors/transform.interceptor';
+import { Module, Global } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
+import { FileProcessingService } from './services/file-processing.service';
+import { GlobalExceptionFilter } from './filters/global-exception.filter';
 
+@Global()
 @Module({
-  providers: [AllExceptionsFilter, LoggingInterceptor, TransformInterceptor],
-  exports: [AllExceptionsFilter, LoggingInterceptor, TransformInterceptor],
+  providers: [
+    FileProcessingService,
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
+  ],
+  exports: [FileProcessingService],
 })
 export class CommonModule {}

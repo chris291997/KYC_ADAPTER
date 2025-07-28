@@ -23,6 +23,10 @@ export * from './document.entity';
 export * from './webhook.entity';
 export * from './webhook-delivery.entity';
 
-// Provider entities (legacy, will be updated)
+// Provider entities
+export * from './provider.entity';
+export * from './provider-config.entity';
+
+// Legacy provider entities (will be deprecated)
 export * from './provider-credential.entity';
 export * from './client-provider-config.entity';

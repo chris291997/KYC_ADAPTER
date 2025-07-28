@@ -12,6 +12,7 @@ import { CommonModule } from './common/common.module';
 import { ProvidersModule } from './providers/providers.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
+import { VerificationsModule } from './verifications/verifications.module';
 
 // Import controllers and services
 import { AppController } from './app.controller';
@@ -39,7 +40,7 @@ import { AdminAuthGuard } from './auth/guards/admin-auth.guard';
         password: process.env.DB_PASSWORD || '',
         database: process.env.DB_NAME || 'kyc_adapter',
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: process.env.NODE_ENV === 'development',
+        synchronize: false, // Disabled to prevent startup conflicts
         logging: process.env.NODE_ENV === 'development',
       }),
     }),
@@ -75,9 +76,9 @@ import { AdminAuthGuard } from './auth/guards/admin-auth.guard';
     ProvidersModule,
     AuthModule,
     TenantsModule,
+    VerificationsModule,
 
     // TODO: Add these modules when they're created
-    // VerificationModule,
     // HealthModule,
   ],
   controllers: [AppController],

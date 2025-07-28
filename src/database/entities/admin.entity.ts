@@ -73,11 +73,6 @@ export class Admin {
   @IsIn(['active', 'inactive', 'suspended'])
   status: AdminStatus;
 
-  @ApiProperty({ description: 'Admin configuration settings', required: false })
-  @Column({ type: 'jsonb', default: {} })
-  @IsOptional()
-  settings: Record<string, any>;
-
   @ApiProperty({ description: 'Last login timestamp', required: false })
   @Column({ type: 'timestamp with time zone', nullable: true, name: 'last_login_at' })
   lastLoginAt?: Date;
