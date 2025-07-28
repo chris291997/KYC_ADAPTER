@@ -20,10 +20,13 @@ A comprehensive NestJS backend application that serves as an adapter for integra
   - JWT: Email/password with refresh tokens
   - Cross-compatible with admin access
 
-### KYC Provider Integration (Planned)
-- **Document Verification**: ID cards, passports, driver's licenses
-- **Biometric Verification**: Selfie matching and liveness detection
-- **Unified API**: Standardized responses across providers
+### KYC Verification System
+- **Document Verification**: Full support for 15+ document types (passport, license, ID card, etc.)
+- **Regula Provider Integration**: Forensic-grade document analysis with 26+ security checks
+- **Automatic User Management**: Creates user accounts from successful verifications
+- **Verification Expiration**: Configurable time-limited verifications (5 minutes to 24 hours)
+- **Production-Ready DTOs**: Comprehensive validation with 15+ configurable fields
+- **File Upload Support**: Both base64 JSON and multipart file uploads
 - **Provider Abstraction**: Easy switching between KYC providers
 
 ### Database & Infrastructure
@@ -294,16 +297,83 @@ src/
 - **API Key Encryption**: Secure key storage
 - **JWT Security**: Signed tokens with audience validation
 
+## 🎯 Current Verification Capabilities
+
+### Document Verification API
+
+```bash
+# Create verification with document images
+POST /api/v1/verifications
+Content-Type: application/json
+Authorization: Bearer {token}
+
+{
+  "verificationType": "document",
+  "documentImages": {
+    "front": "data:image/jpeg;base64,/9j/4AAQ...",
+    "back": "data:image/jpeg;base64,/9j/4AAQ...",
+    "selfie": "data:image/jpeg;base64,/9j/4AAQ..."
+  },
+  "allowedDocumentTypes": ["passport", "drivers_license", "id_card"],
+  "expectedCountries": ["US", "CA", "GB"],
+  "expiresIn": 3600,
+  "requireLiveness": true,
+  "minimumConfidence": 85
+}
+```
+
+### File Upload API
+
+```bash
+# Upload document files directly
+POST /api/v1/verifications/upload
+Content-Type: multipart/form-data
+Authorization: Bearer {token}
+
+# Form fields:
+# - front: Document front image file
+# - back: Document back image file (optional)
+# - selfie: Selfie photo file (optional)
+# - verificationType: "document"
+# - metadata: JSON string with additional data
+```
+
+### User Management
+
+```bash
+# Get verified users for tenant
+GET /api/v1/verifications/users?page=1&limit=20
+Authorization: Bearer {token}
+
+# Response includes:
+# - User profiles created from document data
+# - Verification counts and last verified date
+# - Pagination metadata
+```
+
+### Verification Status
+
+```bash
+# Get verification status and results
+GET /api/v1/verifications/{verificationId}
+Authorization: Bearer {token}
+
+# Returns comprehensive results:
+# - Overall status and confidence score
+# - Extracted document data (name, DOB, etc.)
+# - Security checks (authenticity, validity)
+# - Regula-specific analysis details
+```
+
 ## 🚧 Upcoming Features
 
-- [ ] **Regula Provider Integration**
 - [ ] **Persona Provider Integration** 
-- [ ] **Document Verification Endpoints**
 - [ ] **Biometric Verification Endpoints**
 - [ ] **Webhook System**
 - [ ] **Dashboard Analytics**
-- [ ] **File Upload Handling**
 - [ ] **One-time Verification Links**
+- [ ] **Frontend Demo Application**
+- [ ] **Real-time Status Updates**
 
 ## 📝 Contributing
 

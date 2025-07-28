@@ -12,13 +12,19 @@ export interface CurrentTenantInfo {
 export const CurrentTenant = createParamDecorator(
   (data: keyof CurrentTenantInfo | undefined, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
-    const auth = request.auth as CurrentTenantInfo;
 
+    // Check if we have tenant directly on request (from ApiKeyGuard)
+    if (request.tenant) {
+      return request.tenant;
+    }
+
+    // Fallback to auth structure
+    const auth = request.auth as CurrentTenantInfo;
     if (!auth) {
       return null;
     }
 
-    return data ? auth[data] : auth;
+    return data ? auth[data] : auth.tenant;
   },
 );
 

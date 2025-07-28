@@ -18,6 +18,8 @@ import { Account } from './account.entity';
 import { InquiryTemplate } from './inquiry-template.entity';
 import { Inquiry } from './inquiry.entity';
 import { Webhook } from './webhook.entity';
+import { ProviderConfig } from './provider-config.entity';
+import { Verification } from './verification.entity';
 
 export type TenantStatus = 'active' | 'inactive' | 'suspended' | 'pending';
 
@@ -68,11 +70,11 @@ export class Tenant {
   settings: Record<string, any>;
 
   @ApiProperty({ description: 'Tenant creation timestamp' })
-  @CreateDateColumn({ type: 'timestamp with time zone' })
+  @CreateDateColumn({ type: 'timestamp with time zone', name: 'created_at' })
   createdAt: Date;
 
   @ApiProperty({ description: 'Last update timestamp' })
-  @UpdateDateColumn({ type: 'timestamp with time zone' })
+  @UpdateDateColumn({ type: 'timestamp with time zone', name: 'updated_at' })
   updatedAt: Date;
 
   // Relationships
@@ -90,6 +92,12 @@ export class Tenant {
 
   @OneToMany(() => Webhook, (webhook) => webhook.tenant)
   webhooks: Webhook[];
+
+  @OneToMany(() => ProviderConfig, (config) => config.tenant)
+  providerConfigs: ProviderConfig[];
+
+  @OneToMany(() => Verification, (verification) => verification.tenant)
+  verifications: Verification[];
 
   // Password hashing hooks
   @BeforeInsert()

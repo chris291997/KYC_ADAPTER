@@ -9,7 +9,7 @@ import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { AuthService } from '../auth.service';
 import { AdminAuthService } from '../admin-auth.service';
-import { IS_ADMIN_ROUTE_KEY } from './admin-auth.guard';
+import { JwtService } from '../jwt.service';
 
 export const IS_PUBLIC_KEY = 'isPublic';
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
@@ -21,13 +21,14 @@ export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
   constructor(
+    private readonly reflector: Reflector,
     private readonly authService: AuthService,
     private readonly adminAuthService: AdminAuthService,
-    private readonly reflector: Reflector,
+    private readonly jwtService: JwtService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Check if route is marked as public
+    // Check if this is a public route
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -37,21 +38,46 @@ export class ApiKeyGuard implements CanActivate {
       return true;
     }
 
-    // Check if route is marked as admin-only (let AdminAuthGuard handle it)
-    const isAdminRoute = this.reflector.getAllAndOverride<boolean>(IS_ADMIN_ROUTE_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const request = context.switchToHttp().getRequest<Request>();
 
-    if (isAdminRoute) {
-      return true; // Skip tenant auth for admin routes
+    // Try JWT authentication first (for tenant login flow)
+    const jwtToken = this.extractJwtToken(request);
+    if (jwtToken) {
+      try {
+        const jwtPayload = await this.jwtService.validateAccessToken(jwtToken);
+
+        // For tenant JWT tokens
+        if (jwtPayload.type === 'tenant') {
+          const tenant = await this.authService.getTenantById(jwtPayload.sub);
+          if (tenant && tenant.isActive()) {
+            // Add tenant context to request
+            (request as any).tenant = tenant;
+            (request as any).auth = { tenant, type: 'tenant_jwt' };
+            (request as any).authType = 'tenant';
+            return true;
+          }
+        }
+
+        // For admin JWT tokens
+        if (jwtPayload.type === 'admin') {
+          const admin = await this.adminAuthService.getAdminById(jwtPayload.sub);
+          if (admin && admin.isActive()) {
+            // Add admin context to request (formatted like tenant auth for compatibility)
+            (request as any).admin = admin;
+            (request as any).auth = { admin, type: 'admin_jwt' };
+            (request as any).authType = 'admin';
+            return true;
+          }
+        }
+      } catch (jwtError) {
+        // JWT validation failed, continue to API key authentication
+      }
     }
 
-    const request = context.switchToHttp().getRequest<Request>();
+    // Try API key authentication
     const apiKey = this.extractApiKey(request);
-
     if (!apiKey) {
-      throw new UnauthorizedException('API key is required');
+      throw new UnauthorizedException('Authentication required - provide JWT token or API key');
     }
 
     try {
@@ -87,6 +113,21 @@ export class ApiKeyGuard implements CanActivate {
 
       throw new UnauthorizedException('Invalid API key');
     }
+  }
+
+  /**
+   * Extract JWT token from Authorization header
+   */
+  private extractJwtToken(request: Request): string | null {
+    const authHeader = request.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      // JWT tokens don't start with 'kya_'
+      if (!token.startsWith('kya_')) {
+        return token;
+      }
+    }
+    return null;
   }
 
   /**

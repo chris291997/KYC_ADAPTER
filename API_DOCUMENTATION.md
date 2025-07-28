@@ -402,22 +402,135 @@ curl -X GET http://localhost:3000/api/v1/tenants \
   -H "Authorization: Bearer TENANT_API_KEY"
 ```
 
-## Future KYC Verification Endpoints
+## KYC Verification Endpoints
 
-> **Note**: These endpoints will be implemented in the next phase
-
-### Document Verification
+### Create Document Verification (JSON)
 ```http
-POST /api/v1/verify/document
-Authorization: Bearer kya_... 
-Content-Type: multipart/form-data
+POST /api/v1/verifications
+Authorization: Bearer kya_...
+Content-Type: application/json
 
 {
-  "document": <file>,
-  "documentType": "passport",
-  "country": "US"
+  "verificationType": "document",
+  "documentImages": {
+    "front": "data:image/jpeg;base64,/9j/4AAQ...",
+    "back": "data:image/jpeg;base64,/9j/4AAQ...",
+    "selfie": "data:image/jpeg;base64,/9j/4AAQ..."
+  },
+  "allowedDocumentTypes": ["passport", "drivers_license", "id_card"],
+  "expectedCountries": ["US", "CA", "GB"],
+  "callbackUrl": "https://yourapp.com/webhook",
+  "expiresIn": 3600,
+  "requireLiveness": true,
+  "requireAddressVerification": false,
+  "minimumConfidence": 85,
+  "processingMethod": "direct",
+  "metadata": {
+    "userAgent": "Mozilla/5.0...",
+    "ipAddress": "192.168.1.100",
+    "sessionId": "session-123",
+    "location": {
+      "latitude": 40.7128,
+      "longitude": -74.0060,
+      "country": "US"
+    }
+  }
 }
 ```
+
+### Create Document Verification (File Upload)
+```http
+POST /api/v1/verifications/upload
+Authorization: Bearer kya_...
+Content-Type: multipart/form-data
+
+# Form fields:
+front: <file>              # Required: Document front image
+back: <file>               # Optional: Document back image  
+selfie: <file>             # Optional: Selfie photo
+additional: <file>         # Optional: Additional document
+verificationType: document # Required: Verification type
+callbackUrl: https://yourapp.com/webhook
+metadata: {"custom": "data"}  # Optional: JSON string
+```
+
+### Get Verification Status
+```http
+GET /api/v1/verifications/{verificationId}
+Authorization: Bearer kya_...
+
+Response:
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "result": {
+    "overall": {
+      "status": "passed",
+      "confidence": 94,
+      "riskLevel": "low"
+    },
+    "document": {
+      "extracted": {
+        "firstName": "John",
+        "lastName": "Doe",
+        "dateOfBirth": "1990-01-01",
+        "nationality": "USA",
+        "documentNumber": "123456789"
+      },
+      "checks": {
+        "authenticity": "passed",
+        "validity": "passed",
+        "dataConsistency": "passed"
+      }
+    },
+    "regula": {
+      "documentType": "US_PASSPORT",
+      "securityFeatures": {
+        "hologram": true,
+        "uvFeatures": true
+      }
+    }
+  }
+}
+```
+
+### List Verifications
+```http
+GET /api/v1/verifications?page=1&limit=20&status=completed
+Authorization: Bearer kya_...
+```
+
+### Get Verified Users
+```http
+GET /api/v1/verifications/users?page=1&limit=20
+Authorization: Bearer kya_...
+
+Response:
+{
+  "users": [
+    {
+      "id": "user-123",
+      "name": {"first": "John", "last": "Doe"},
+      "referenceId": "USA_123456789",
+      "verificationCount": 2,
+      "lastVerified": "2025-01-28T10:30:00Z"
+    }
+  ],
+  "total": 150,
+  "page": 1,
+  "totalPages": 8
+}
+```
+
+### Cancel Verification
+```http
+DELETE /api/v1/verifications/{verificationId}
+Authorization: Bearer kya_...
+```
+
+## Future Biometric Verification Endpoints
+
+> **Note**: These endpoints will be implemented in the next phase
 
 ### Biometric Verification
 ```http
@@ -429,12 +542,6 @@ Content-Type: multipart/form-data
   "selfie": <file>,
   "referenceDocument": <file>
 }
-```
-
-### Verification Status
-```http
-GET /api/v1/verifications/{verificationId}
-Authorization: Bearer kya_...
 ```
 
 ## Swagger Documentation

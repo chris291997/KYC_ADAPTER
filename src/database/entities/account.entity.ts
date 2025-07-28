@@ -15,6 +15,7 @@ import { Type } from 'class-transformer';
 import { Tenant } from './tenant.entity';
 import { Inquiry } from './inquiry.entity';
 import { Document } from './document.entity';
+import { Verification } from './verification.entity';
 
 export interface PersonName {
   first?: string;
@@ -99,6 +100,9 @@ export class Account {
 
   @OneToMany(() => Document, (document) => document.account)
   documents: Document[];
+
+  @OneToMany(() => Verification, (verification) => verification.account)
+  verifications: Verification[];
 
   // Helper methods
   getFullName(): string {

@@ -15,7 +15,7 @@ export class ProvidersFactory {
    * Register a provider with the factory
    */
   registerProvider(provider: IKycProvider, metadata: ProviderMetadata): void {
-    const name = provider.getProviderName();
+    const name = provider.name;
 
     this.logger.log(`Registering KYC provider: ${name}`);
 
@@ -91,7 +91,8 @@ export class ProvidersFactory {
 
     for (const [name, provider] of this.providers.entries()) {
       try {
-        healthStatus[name] = await provider.isAvailable();
+        const healthCheck = await provider.healthCheck();
+        healthStatus[name] = healthCheck.isHealthy;
       } catch (error) {
         this.logger.error(`Health check failed for provider ${name}:`, error);
         healthStatus[name] = false;

@@ -8,14 +8,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Regula KYC provider integration
 - Persona KYC provider integration  
-- Document verification endpoints
 - Biometric verification endpoints
 - Webhook system for provider callbacks
 - Dashboard analytics and reporting
 - File upload handling with AWS S3
 - One-time verification links
+- Frontend demo application
+- Real-time verification status updates
+
+## [1.1.0] - 2025-01-28
+
+### Added
+
+#### Verification Expiration System
+- **Automatic Expiration Management**: Verifications now automatically expire based on configurable timeouts
+- **Real-time Status Updates**: `getVerification()` endpoint automatically checks and updates expired verifications
+- **Configurable Expiration Times**: Default 1 hour, configurable from 5 minutes to 24 hours via `expiresIn` parameter
+- **Database Integration**: Added `expires_at` field storage and automatic status updates to `EXPIRED`
+- **Enterprise Compliance**: Meets regulatory requirements for time-limited verification sessions
+
+#### User Account Management System
+- **Automatic Account Creation**: Successful verifications automatically create user accounts from extracted document data
+- **Intelligent Deduplication**: Uses `nationality + documentNumber` as unique reference to prevent duplicate accounts
+- **Account Linking**: Verifications are automatically linked to created accounts for complete audit trails
+- **User Profile Management**: Extracts and stores `firstName`, `lastName`, `dateOfBirth`, `nationality` from documents
+- **Verified Users API**: New `GET /verifications/users` endpoint for paginated user management
+
+#### Production-Ready DTOs and Validation
+- **Enhanced CreateVerificationDto**: Expanded from 5 to 15+ comprehensive fields including:
+  - `allowedDocumentTypes`: Specify acceptable document types (passport, license, ID card)
+  - `expectedCountries`: Geographic restrictions for document validation
+  - `requireLiveness`: Biometric liveness detection requirements
+  - `minimumConfidence`: Configurable confidence thresholds for verification acceptance
+  - `processingMethod`: Direct vs external link processing methods
+  - `expiresIn`: Custom expiration timeouts
+- **Comprehensive Metadata Collection**: New `VerificationMetadataDto` with nested structures for:
+  - `LocationDto`: Geographic context (latitude, longitude, country, timezone)
+  - `DeviceInfoDto`: Device fingerprinting (type, model, OS, browser details)
+  - Session tracking (`sessionId`, `userAgent`, `ipAddress`, `referrer`)
+  - Application context (`appVersion`, `initiatedAt`, `custom` properties)
+- **Advanced Validation**: Production-grade validation with `@IsEnum()`, `@IsBase64()`, `@Min()`, `@Max()`, `@ValidateNested()`
+- **Rich Documentation**: Comprehensive Swagger examples and descriptions for all fields
+
+#### File Upload System
+- **Multipart File Upload Support**: New `POST /verifications/upload` endpoint for actual file uploads
+- **Named File Field Handling**: Support for `front`, `back`, `selfie`, `additional` document images
+- **File Processing Service**: Automated image optimization, format conversion, and base64 encoding
+- **Temporary File Management**: Secure temporary storage with automatic cleanup
+- **Robust Error Handling**: Graceful handling of invalid file formats, oversized files, and malformed requests
+- **Dual Input Methods**: Support for both base64 JSON and multipart file uploads
+
+#### API Enhancements and Bug Fixes
+- **Route Conflict Resolution**: Fixed `GET /verifications/users` vs `GET /verifications/:id` route matching
+- **Controller Consolidation**: Merged `VerificationsUploadController` into main `VerificationsController`
+- **Enhanced Error Messages**: Improved validation error responses with detailed field-level feedback
+- **Swagger Documentation**: Comprehensive API documentation with realistic examples and use cases
+- **FileFieldsInterceptor Integration**: Proper handling of named multipart file fields
+
+#### Testing and Demo Capabilities
+- **Verification Expiration Testing**: `test-expiration.ps1` script for testing automatic expiration
+- **File Upload Testing**: `test-file-upload.ps1` and `test-upload-simple.ps1` for multipart upload validation
+- **Comprehensive Test Coverage**: Scripts covering normal flows, edge cases, and error scenarios
+- **Demo Documentation**: Complete visual diagrams in `KYC_DIAGRAMS.md`
+
+### Enhanced
+
+#### Regula Provider Integration
+- **Mock Provider Improvements**: Enhanced simulation of Regula's document processing capabilities
+- **Realistic Response Data**: Comprehensive mock responses matching Regula's actual output format
+- **Security Feature Simulation**: Mock hologram detection, UV/IR feature analysis, and document liveness
+- **Performance Metrics**: Simulated processing times and confidence scoring
+
+#### Database Schema and Performance
+- **Verification Storage**: Enhanced verification table with expiration tracking and metadata storage
+- **Account Management**: Improved account creation and linking with verification results
+- **Query Optimization**: Efficient pagination and filtering for user management endpoints
+- **Audit Trail Enhancement**: Complete tracking of verification lifecycle and account creation
+
+### Technical Specifications
+
+#### Verification Lifecycle
+```
+PENDING → IN_PROGRESS → COMPLETED/FAILED
+    ↓         ↓
+  EXPIRED ← EXPIRED
+```
+
+#### Account Creation Flow
+- Triggered on verification status = `COMPLETED`
+- Extracts: `firstName`, `lastName`, `dateOfBirth`, `nationality`, `documentNumber`
+- Creates `referenceId` as `{nationality}_{documentNumber}` for deduplication
+- Links verification to account via `accountId` field
+
+#### Expiration Management
+- Default expiration: 3600 seconds (1 hour)
+- Configurable range: 300 seconds (5 minutes) to 86400 seconds (24 hours)
+- Automatic status checking on `getVerification()` calls
+- Database updates with timestamp tracking
+
+#### File Upload Specifications
+- Supported formats: JPEG, PNG, PDF
+- Maximum file size: 10MB per file
+- Image optimization: Automatic resizing and compression
+- Temporary storage: Secure cleanup after processing
+- Concurrent upload support: Multiple files in single request
 
 ## [1.0.0] - 2025-01-27
 
