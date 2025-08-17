@@ -17,7 +17,8 @@ cp env.example .env
 # Edit the .env file with your settings (minimum required):
 # - DB_PASSWORD: Change to a secure password
 # - JWT_SECRET: Generate a secure secret
-# - API_KEY_ENCRYPTION_KEY: Generate a 32-character key
+# - API_KEY_ENC_KEY: Generate a 32-character key (AES-256-GCM)
+# - IMGBB_API_KEY: (optional) enable temporary image hosting
 ```
 
 ### 3. Start Database & Run Migrations
@@ -42,39 +43,45 @@ npm run start:dev
 
 ## 📋 Next Steps
 
-### 1. Add Provider Credentials
-```sql
--- Connect to your database and add provider credentials
-psql -h localhost -U kyc_user -d kyc_adapter
-
--- Add Regula credentials (replace with your actual key)
-INSERT INTO provider_credentials (provider_name, credential_type, encrypted_value) 
-VALUES ('regula', 'api_key', crypt('your-regula-api-key', gen_salt('bf')));
-```
-
-### 2. Create Test Client
-```sql
--- Create a test client
-INSERT INTO clients (name, email, api_key, api_key_hash) 
-VALUES (
-    'Test Client',
-    'test@example.com',
-    encode(sha256('test-api-key-12345'::bytea), 'hex'),
-    crypt('test-api-key-12345', gen_salt('bf'))
-);
-
--- Get the client ID and assign Regula provider
-SELECT id FROM clients WHERE email = 'test@example.com';
--- Copy the UUID and use it below
-
-INSERT INTO client_provider_configs (client_id, provider_name) 
-VALUES ('[PASTE-CLIENT-UUID-HERE]', 'regula');
-```
-
-### 3. Test API with Client
+### 1. Create a Tenant and API Key (via Admin API)
 ```bash
-# Test API key authentication
-curl -H "x-api-key: test-api-key-12345" http://localhost:3000/api/v1/health
+# 1) Login as admin to get JWT
+curl -s -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@kyc-adapter.dev","password":"admin123"}' | jq
+
+# 2) Create a tenant (temporaryPassword will be generated if not provided)
+curl -s -X POST http://localhost:3000/api/v1/tenants \
+  -H "Authorization: Bearer <ADMIN_JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Demo Company","email":"demo@company.com","status":"active"}' | jq
+
+# 3) Create a tenant API key (copy the returned apiKey now)
+curl -s -X POST http://localhost:3000/api/v1/tenants/<TENANT_ID>/api-keys \
+  -H "Authorization: Bearer <ADMIN_JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Demo API Key","expiresAt":"2026-01-01T00:00:00.000Z"}' | jq
+```
+
+### 2. Assign the Mock Provider to Tenant
+```bash
+# Regula mock provider is available out of the box
+curl -s -X POST http://localhost:3000/api/v1/admin/providers/tenants/<TENANT_ID>/assign \
+  -H "Authorization: Bearer <ADMIN_JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"providerName":"regula-mock","isPrimary":true,"config":{"processingMethod":"direct"}}' | jq
+```
+
+### 3. Test a Verification
+```bash
+curl -s -X POST http://localhost:3000/api/v1/verifications \
+  -H "X-API-Key: <TENANT_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "verificationType":"document",
+    "documentImages":{"front":"data:image/jpeg;base64,/9j/4AAQ..."},
+    "metadata":{"simulate":{"forceStatus":"passed"}}
+  }' | jq
 ```
 
 ## 🛠️ Alternative Setup (Local PostgreSQL)
@@ -119,7 +126,7 @@ DB_NAME=kyc_adapter
 **Required:**
 - `DB_PASSWORD` - PostgreSQL password
 - `JWT_SECRET` - JWT signing secret (min 32 chars)
-- `API_KEY_ENCRYPTION_KEY` - Encryption key (exactly 32 chars)
+- `API_KEY_ENC_KEY` - Encryption key (exactly 32 chars)
 
 **Provider Credentials (when ready):**
 - `REGULA_API_KEY` - Your Regula API key
@@ -129,6 +136,7 @@ DB_NAME=kyc_adapter
 - `PORT` - Server port (default: 3000)
 - `LOG_LEVEL` - Logging level (default: info)
 - `THROTTLE_LIMIT` - Rate limit per minute (default: 100)
+- `IMGBB_API_KEY` - Enable temporary image hosting of uploaded images
 
 ## 🎯 Testing Your Setup
 

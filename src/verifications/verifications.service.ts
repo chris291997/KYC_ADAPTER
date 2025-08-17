@@ -18,6 +18,7 @@ import {
   VerificationRequest,
   VerificationResponse,
 } from '../providers/types/provider.types';
+import { ImgbbService } from '../common/services/imgbb.service';
 
 export interface CreateVerificationRequest {
   tenantId: string;
@@ -58,6 +59,7 @@ export class VerificationsService {
     @InjectRepository(Account)
     private readonly accountRepository: Repository<Account>,
     private readonly providersFactory: ProvidersFactory,
+    private readonly imgbbService: ImgbbService,
   ) {}
 
   /**
@@ -81,13 +83,32 @@ export class VerificationsService {
         request.tenantId,
       );
 
-      // 4. Create verification request for the provider
+      // 4. Optionally upload images to imgbb (temporary hosting)
+      const imageUrls = await this.uploadDocumentImagesToImgbb(
+        request.documentImages || {},
+        request.tenantId,
+      );
+
+      // 5. Create verification request for the provider
       const providerRequest = this.buildProviderRequest(request, config);
 
-      // 5. Execute verification with the provider
+      // 6. Execute verification with the provider
       const providerResponse = await provider.createVerification(providerRequest);
 
-      // 6. Store verification in database
+      // 6b. Attach hosted image URLs into results for downstream rendering (admin/tenant UIs)
+      if (imageUrls && Object.keys(imageUrls).length > 0) {
+        providerResponse.result =
+          providerResponse.result ||
+          ({
+            overall: { status: 'pending', confidence: 0, riskLevel: 'low' },
+          } as any);
+        (providerResponse.result as any).metadata = {
+          ...(providerResponse.result as any).metadata,
+          imageUrls,
+        };
+      }
+
+      // 7. Store verification in database
       const verification = await this.storeVerification(
         request,
         provider.name,
@@ -356,6 +377,48 @@ export class VerificationsService {
   }
 
   // Private helper methods
+  /**
+   * Upload provided base64 images to imgbb if configured.
+   * Returns a map of present image keys to hosted URLs.
+   */
+  private async uploadDocumentImagesToImgbb(
+    images: { front?: string; back?: string; selfie?: string },
+    tenantId: string,
+  ): Promise<Record<string, string>> {
+    const urls: Record<string, string> = {};
+    try {
+      if (!this.imgbbService.isEnabled()) {
+        return urls;
+      }
+      // Load tenant to read virtual album prefix if available
+      const tenant = await this.validateTenant(tenantId);
+      const prefix = (tenant.settings as any)?.imgbbPrefix || `tenant_${tenantId}`;
+
+      const entries: Array<[keyof typeof images, string | undefined]> = [
+        ['front', images.front],
+        ['back', images.back],
+        ['selfie', images.selfie],
+      ];
+
+      await Promise.all(
+        entries
+          .filter(([, b64]) => Boolean(b64))
+          .map(async ([key, b64]) => {
+            const uploaded = await this.imgbbService.uploadBase64(b64 as string, {
+              name: `${prefix}_${key}`,
+            });
+            if (uploaded?.url) {
+              urls[`${key}Url`] = uploaded.url;
+            }
+          }),
+      );
+
+      return urls;
+    } catch (err) {
+      this.logger.warn(`Skipping imgbb upload: ${err?.message || err}`);
+      return urls;
+    }
+  }
 
   private async validateTenant(tenantId: string): Promise<Tenant> {
     try {

@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
 import { Tenant, TenantApiKey, ApiKeyStatus } from '../database/entities';
 
 export interface AuthenticatedTenant {
@@ -19,6 +19,38 @@ export class AuthService {
     @InjectRepository(TenantApiKey)
     private readonly apiKeyRepository: Repository<TenantApiKey>,
   ) {}
+
+  // KMS/ENV: symmetric key for encrypting API keys (32 bytes for AES-256-GCM)
+  private getEncryptionKey(): Buffer {
+    const key = process.env.API_KEY_ENC_KEY || '';
+    if (key.length !== 64) {
+      // Expect hex-encoded 32-byte key
+      throw new Error('API_KEY_ENC_KEY must be 64 hex chars (32 bytes)');
+    }
+    return Buffer.from(key, 'hex');
+  }
+
+  private encryptApiKey(plain: string): { ciphertextB64: string; ivB64: string } {
+    const key = this.getEncryptionKey();
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', key, iv);
+    const ciphertext = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    const payload = Buffer.concat([ciphertext, tag]).toString('base64');
+    return { ciphertextB64: payload, ivB64: iv.toString('base64') };
+  }
+
+  private decryptApiKey(ciphertextB64: string, ivB64: string): string {
+    const key = this.getEncryptionKey();
+    const iv = Buffer.from(ivB64, 'base64');
+    const data = Buffer.from(ciphertextB64, 'base64');
+    const ciphertext = data.slice(0, -16);
+    const tag = data.slice(-16);
+    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+    return plain;
+  }
 
   /**
    * Validate API key and return authenticated tenant
@@ -89,6 +121,15 @@ export class AuthService {
       status: 'active' as ApiKeyStatus,
     });
 
+    // Encrypt and store
+    try {
+      const enc = this.encryptApiKey(apiKey);
+      apiKeyEntity.keyEncrypted = enc.ciphertextB64;
+      apiKeyEntity.keyIv = enc.ivB64;
+    } catch (e) {
+      this.logger.warn('API key encryption not configured; set API_KEY_ENC_KEY for reveal support');
+    }
+
     await this.apiKeyRepository.save(apiKeyEntity);
 
     this.logger.log(`Generated new API key '${name}' for tenant ${tenantId}`);
@@ -97,6 +138,21 @@ export class AuthService {
       apiKey, // Return the raw API key (only time it's available)
       entity: apiKeyEntity,
     };
+  }
+
+  /**
+   * Reveal stored API key (requires encryption key)
+   */
+  async revealApiKey(apiKeyId: string): Promise<string> {
+    const record = await this.apiKeyRepository.findOne({ where: { id: apiKeyId } });
+    if (!record || !record.keyEncrypted || !record.keyIv) {
+      throw new UnauthorizedException('API key cannot be revealed (not stored encrypted)');
+    }
+    try {
+      return this.decryptApiKey(record.keyEncrypted, record.keyIv);
+    } catch (e) {
+      throw new UnauthorizedException('API key reveal failed');
+    }
   }
 
   /**

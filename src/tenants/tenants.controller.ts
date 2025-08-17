@@ -27,6 +27,7 @@ import { AdminOnly, RequireRole } from '../auth/guards/admin-auth.guard';
 import { GetAdmin } from '../auth/decorators/current-admin.decorator';
 import { Admin } from '../database/entities';
 import { TenantsService } from './tenants.service';
+import { AuthService } from '../auth/auth.service';
 import {
   CreateTenantDto,
   UpdateTenantDto,
@@ -43,7 +44,10 @@ import {
 @AdminOnly() // All endpoints require admin authentication
 @Controller('tenants')
 export class TenantsController {
-  constructor(private readonly tenantsService: TenantsService) {}
+  constructor(
+    private readonly tenantsService: TenantsService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Post()
   @RequireRole('super_admin', 'admin')
@@ -348,6 +352,81 @@ export class TenantsController {
   }
 
   // ================================================
+  // USERS (ACCOUNTS) - ADMIN VIEWS
+  // ================================================
+
+  @Get(':tenantId/users')
+  @ApiOperation({
+    summary: 'List Tenant Users',
+    description: `
+      List user accounts for a tenant (admin-only).
+      Includes pagination and basic profile fields.
+    `,
+  })
+  @ApiParam({
+    name: 'tenantId',
+    description: 'Tenant ID',
+    example: '77815e4c-a3e8-41fb-90c5-ed3aeb79f859',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiResponse({ status: 200, description: 'Users listed successfully' })
+  async listTenantUsers(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.tenantsService.listTenantUsers(
+      tenantId,
+      page ? parseInt(page.toString(), 10) : 1,
+      limit ? Math.min(parseInt(limit.toString(), 10), 100) : 20,
+    );
+  }
+
+  @Get(':tenantId/users/:accountId')
+  @ApiOperation({
+    summary: 'Get Tenant User Details',
+    description: `
+      Get detailed information about a user account within a specific tenant.
+    `,
+  })
+  @ApiParam({
+    name: 'tenantId',
+    description: 'Tenant ID',
+    example: '77815e4c-a3e8-41fb-90c5-ed3aeb79f859',
+  })
+  @ApiParam({
+    name: 'accountId',
+    description: 'Account ID (UUID)',
+    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+  })
+  @ApiResponse({ status: 200, description: 'User details retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'User not found in tenant' })
+  async getTenantUserById(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+  ) {
+    return this.tenantsService.getTenantUserById(tenantId, accountId);
+  }
+
+  @Get(':tenantId/users/:accountId/overview')
+  @ApiOperation({
+    summary: 'Get Tenant User Overview',
+    description:
+      'Returns user details, their verifications, and an aggregated list of all associated image URLs (front/back/selfie).',
+  })
+  @ApiParam({ name: 'tenantId', description: 'Tenant ID (UUID)' })
+  @ApiParam({ name: 'accountId', description: 'Account ID (UUID)' })
+  @ApiResponse({ status: 200, description: 'Overview returned successfully' })
+  @ApiResponse({ status: 404, description: 'User not found in tenant' })
+  async getTenantUserOverview(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+  ) {
+    return this.tenantsService.getTenantUserOverview(tenantId, accountId);
+  }
+
+  // ================================================
   // API KEY MANAGEMENT ENDPOINTS
   // ================================================
 
@@ -433,7 +512,7 @@ export class TenantsController {
       - Usage statistics (request counts, etc.)
       
       **Security Note:**
-      - Actual key values are never returned
+      - Actual key values are never returned after creation
       - Only key hashes and metadata are shown
       - Use this for key management and monitoring
     `,
@@ -506,6 +585,73 @@ export class TenantsController {
     @Param('apiKeyId', ParseUUIDPipe) apiKeyId: string,
   ): Promise<void> {
     return this.tenantsService.revokeApiKey(tenantId, apiKeyId);
+  }
+
+  @Put(':tenantId/api-keys/:apiKeyId')
+  @ApiOperation({
+    summary: 'Update API Key (name, expiration, status)',
+    description: `
+      Update an API key's human-readable name, expiration date, or status.
+      
+      - To remove expiration, set expiresAt to null
+      - Key value cannot be changed (never returned after creation)
+    `,
+  })
+  @ApiParam({ name: 'tenantId', description: 'Unique tenant identifier (UUID)' })
+  @ApiParam({ name: 'apiKeyId', description: 'Unique API key identifier (UUID)' })
+  @ApiBody({
+    description: 'Update API key payload',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        expiresAt: { type: 'string', nullable: true, example: '2026-01-01T00:00:00.000Z' },
+        status: { type: 'string', enum: ['active', 'inactive', 'expired', 'revoked'] },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'API key updated successfully' })
+  @ApiResponse({ status: 404, description: 'API key not found or does not belong to tenant' })
+  async updateApiKey(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('apiKeyId', ParseUUIDPipe) apiKeyId: string,
+    @Body() body: any,
+  ) {
+    const { name, expiresAt, status } = body || {};
+    return this.tenantsService.updateApiKey(tenantId, apiKeyId, { name, expiresAt, status });
+  }
+
+  @Post(':tenantId/api-keys/:apiKeyId/reveal')
+  @ApiOperation({
+    summary: 'Reveal API Key (admin re-auth recommended)',
+    description: 'Returns the plaintext API key if encryption is configured.',
+  })
+  @ApiParam({ name: 'tenantId', description: 'Unique tenant identifier (UUID)' })
+  @ApiParam({ name: 'apiKeyId', description: 'API key identifier (UUID)' })
+  @ApiResponse({ status: 200, description: 'Plaintext key returned' })
+  async revealApiKey(
+    @Param('tenantId', ParseUUIDPipe) _tenantId: string,
+    @Param('apiKeyId', ParseUUIDPipe) apiKeyId: string,
+  ) {
+    // Note: consider adding admin re-auth/OTP and audit logging here
+    const key = await this.authService.revealApiKey(apiKeyId);
+    return { apiKey: key };
+  }
+
+  @Post(':tenantId/api-keys/:apiKeyId/copy')
+  @ApiOperation({
+    summary: 'Copy API Key (reveal existing key)',
+  })
+  @ApiParam({ name: 'tenantId', description: 'Unique tenant identifier (UUID)' })
+  @ApiParam({ name: 'apiKeyId', description: 'API key identifier (UUID) to copy from' })
+  @ApiResponse({ status: 200, description: 'Existing API key returned (if encryption enabled)' })
+  async copyApiKey(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('apiKeyId', ParseUUIDPipe) apiKeyId: string,
+  ) {
+    // Alias to reveal; does NOT create a new key
+    const apiKey = await this.authService.revealApiKey(apiKeyId);
+    return { apiKey };
   }
 
   @Get(':tenantId/stats')

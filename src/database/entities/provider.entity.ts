@@ -54,34 +54,34 @@ export class Provider {
   credentials?: ProviderCredentials;
 
   @ApiProperty({ description: 'Provider default configuration settings' })
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'jsonb', name: 'default_config', default: {} })
   @IsOptional()
   defaultConfig: Record<string, any>;
 
   @ApiProperty({ description: 'Whether this provider is active and available for use' })
-  @Column({ type: 'boolean', default: true })
+  @Column({ type: 'boolean', name: 'is_active', default: true })
   @IsBoolean()
   isActive: boolean;
 
   @ApiProperty({ description: 'Provider API endpoint URL', required: false })
-  @Column({ type: 'varchar', length: 500, nullable: true })
+  @Column({ type: 'varchar', length: 500, nullable: true, name: 'api_url' })
   @IsOptional()
   @IsString()
   apiUrl?: string;
 
   @ApiProperty({ description: 'Provider webhook endpoint URL', required: false })
-  @Column({ type: 'varchar', length: 500, nullable: true })
+  @Column({ type: 'varchar', length: 500, nullable: true, name: 'webhook_url' })
   @IsOptional()
   @IsString()
   webhookUrl?: string;
 
   @ApiProperty({ description: 'Maximum daily verifications allowed', required: false })
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'integer', nullable: true, name: 'max_daily_verifications' })
   @IsOptional()
   maxDailyVerifications?: number;
 
   @ApiProperty({ description: 'Provider priority for selection (lower = higher priority)' })
-  @Column({ type: 'integer', default: 100 })
+  @Column({ type: 'integer', default: 1 })
   priority: number;
 
   @ApiProperty({ description: 'Provider metadata and additional settings' })

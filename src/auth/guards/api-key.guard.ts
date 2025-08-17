@@ -66,6 +66,15 @@ export class ApiKeyGuard implements CanActivate {
             (request as any).admin = admin;
             (request as any).auth = { admin, type: 'admin_jwt' };
             (request as any).authType = 'admin';
+
+            // Optional: act-as-tenant support for admins via header/query
+            const overrideTenantId = this.getTenantOverride(request);
+            if (overrideTenantId) {
+              const tenant = await this.authService.getTenantById(overrideTenantId);
+              if (tenant && tenant.isActive()) {
+                (request as any).tenant = tenant;
+              }
+            }
             return true;
           }
         }
@@ -104,6 +113,15 @@ export class ApiKeyGuard implements CanActivate {
             type: 'admin',
           };
           (request as any).authType = 'admin';
+
+          // Optional: act-as-tenant support for admins via header/query
+          const overrideTenantId = this.getTenantOverride(request);
+          if (overrideTenantId) {
+            const tenant = await this.authService.getTenantById(overrideTenantId);
+            if (tenant && tenant.isActive()) {
+              (request as any).tenant = tenant;
+            }
+          }
 
           return true;
         }
@@ -169,5 +187,15 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     return null;
+  }
+
+  /**
+   * For admins, allow acting as a tenant by specifying tenant ID
+   * via header 'X-Tenant-Id' or query parameters 'tenantId' | 'tenant_id'
+   */
+  private getTenantOverride(request: Request): string | null {
+    const headerTenantId = (request.headers['x-tenant-id'] as string) || null;
+    const queryTenantId = (request.query['tenantId'] as string) || (request.query['tenant_id'] as string) || null;
+    return headerTenantId || queryTenantId || null;
   }
 }

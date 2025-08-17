@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, IsNotEmpty, IsOptional, IsIn, ValidateNested } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsIn,
+  ValidateNested,
+  MinLength,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { TenantStatus } from '../../database/entities';
 
@@ -37,4 +45,16 @@ export class CreateTenantDto {
   @ValidateNested()
   @Type(() => Object)
   settings?: Record<string, any>;
+
+  @ApiProperty({
+    description:
+      'Initial password (min 8 characters); if omitted, a temporary password will be generated and returned only once',
+    required: false,
+    minLength: 8,
+    writeOnly: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  password?: string;
 }

@@ -169,6 +169,12 @@ export class MockRegulaProvider implements IKycProvider {
     // Simulate processing delay (Regula is fast for direct processing)
     await new Promise((resolve) => setTimeout(resolve, this.getRandomNumber(500, 1500)));
 
+    // Deterministic simulation triggers via request metadata
+    const simulated = this.applySimulationOverrides(request);
+    if (simulated) {
+      return simulated;
+    }
+
     // Simulate 90% success rate for direct processing
     const isSuccess = Math.random() > 0.1;
 
@@ -212,6 +218,74 @@ export class MockRegulaProvider implements IKycProvider {
     };
 
     return result;
+  }
+
+  /**
+   * Inspect request to deterministically produce failures for testing.
+   * Supported flags (in request.metadata.simulate):
+   * - forceStatus: 'failed' | 'passed'
+   * - poorImageQuality: boolean
+   * - expiredDocument: boolean
+   * - confidence: number (0-100) to override
+   */
+  private applySimulationOverrides(request: VerificationRequest): VerificationResult | null {
+    const simulate = (request as any)?.metadata?.simulate;
+    if (!simulate) {
+      return null; // Simulation is opt-in only
+    }
+
+    // If explicit forceStatus provided
+    if (simulate.forceStatus === 'failed') {
+      return this.generateFailureResult(simulate.confidence);
+    }
+    if (simulate.forceStatus === 'passed') {
+      return {
+        overall: {
+          status: 'passed',
+          confidence: typeof simulate.confidence === 'number' ? simulate.confidence : 90,
+          riskLevel: 'low',
+        },
+      } as VerificationResult;
+    }
+
+    // Randomized failure rate (0..1) when requested
+    if (typeof simulate.failureRate === 'number' && simulate.failureRate > 0) {
+      if (Math.random() < Math.max(0, Math.min(1, simulate.failureRate))) {
+        return this.generateFailureResult(
+          typeof simulate.confidence === 'number'
+            ? simulate.confidence
+            : this.getRandomNumber(10, 35),
+        );
+      }
+    }
+
+    // Poor image quality only when explicitly flagged
+    if (simulate.poorImageQuality === true) {
+      const result = this.generateFailureResult(
+        typeof simulate.confidence === 'number'
+          ? simulate.confidence
+          : this.getRandomNumber(10, 35),
+      );
+      (result.risks ||= []).push({
+        type: 'explicit_poor_image_quality',
+        level: 'high',
+        description: 'Forced poor image quality scenario',
+      } as any);
+      return result;
+    }
+
+    // Expired document
+    if (simulate.expiredDocument === true) {
+      const res = this.generateFailureResult(this.getRandomNumber(10, 35));
+      (res.risks ||= []).push({
+        type: 'document_expired',
+        level: 'high',
+        description: 'Document is expired',
+      } as any);
+      return res;
+    }
+
+    return null;
   }
 
   private processDocumentVerification() {
@@ -269,11 +343,14 @@ export class MockRegulaProvider implements IKycProvider {
     };
   }
 
-  private generateFailureResult(): VerificationResult {
+  private generateFailureResult(confidenceOverride?: number): VerificationResult {
     return {
       overall: {
         status: 'failed',
-        confidence: this.getRandomNumber(10, 35),
+        confidence:
+          typeof confidenceOverride === 'number'
+            ? confidenceOverride
+            : this.getRandomNumber(10, 35),
         riskLevel: 'high',
       },
       risks: [
