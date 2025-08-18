@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { WinstonModule } from 'nest-winston';
 import { APP_GUARD } from '@nestjs/core';
 import * as winston from 'winston';
@@ -13,10 +13,15 @@ import { ProvidersModule } from './providers/providers.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { VerificationsModule } from './verifications/verifications.module';
+import { Tenant } from './database/entities';
 
 // Import controllers and services
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import {
+  AdminAnalyticsController,
+  AdminTenantsAnalyticsController,
+} from './admin/admin-analytics.controller';
 
 // Import guards
 import { ApiKeyGuard } from './auth/guards/api-key.guard';
@@ -78,10 +83,13 @@ import { AdminAuthGuard } from './auth/guards/admin-auth.guard';
     TenantsModule,
     VerificationsModule,
 
+    // Repositories used directly in controllers declared here
+    TypeOrmModule.forFeature([Tenant]),
+
     // TODO: Add these modules when they're created
     // HealthModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, AdminAnalyticsController, AdminTenantsAnalyticsController],
   providers: [
     AppService,
     // Global guards (order matters - admin auth first, then tenant auth)

@@ -5,12 +5,13 @@ import { VerificationsService } from './verifications.service';
 import { VerificationsController } from './verifications.controller';
 import { ProvidersModule } from '../providers/providers.module';
 import { FileProcessingService } from '../common/services/file-processing.service';
+import { ImgbbService } from '../common/services/imgbb.service';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Tenant, Account]), AuthModule, ProvidersModule],
   controllers: [VerificationsController],
-  providers: [VerificationsService, FileProcessingService],
-  exports: [VerificationsService, FileProcessingService],
+  providers: [VerificationsService, FileProcessingService, ImgbbService],
+  exports: [VerificationsService, FileProcessingService, ImgbbService],
 })
 export class VerificationsModule {}

@@ -1,4 +1,4 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { createParamDecorator, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Tenant, TenantApiKey } from '../../database/entities';
 
 export interface CurrentTenantInfo {
@@ -20,8 +20,10 @@ export const CurrentTenant = createParamDecorator(
 
     // Fallback to auth structure
     const auth = request.auth as CurrentTenantInfo;
-    if (!auth) {
-      return null;
+    if (!auth || !auth.tenant) {
+      throw new UnauthorizedException(
+        'Tenant authentication required - valid API key or JWT token needed',
+      );
     }
 
     return data ? auth[data] : auth.tenant;
@@ -33,6 +35,11 @@ export const CurrentTenant = createParamDecorator(
  */
 export const GetTenant = createParamDecorator((data: unknown, ctx: ExecutionContext): Tenant => {
   const request = ctx.switchToHttp().getRequest();
+  if (!request.tenant) {
+    throw new UnauthorizedException(
+      'Tenant authentication required - valid API key or JWT token needed',
+    );
+  }
   return request.tenant;
 });
 

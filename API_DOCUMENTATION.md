@@ -24,8 +24,8 @@ The KYC Adapter supports multiple authentication methods:
 - **Format**: `kya_` + 64 hex characters
 - **Usage**: Tenant-specific operations, KYC verification
 - **Headers**:
-  - `Authorization: Bearer kya_...`
-  - `X-API-Key: kya_...` 
+  - `X-API-Key: kya_...` (preferred)
+  - `Authorization: Bearer kya_...` (supported)
   - Query parameter: `?api_key=kya_...`
 
 ### 2. JWT Authentication
@@ -229,6 +229,25 @@ Content-Type: application/json
 
 **Permissions**: Requires `super_admin` or `admin` role
 
+**Response (example):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "77815e4c-a3e8-41fb-90c5-ed3aeb79f859",
+    "name": "Example Company",
+    "email": "contact@example.com",
+    "status": "active",
+    "settings": {
+      "imgbbPrefix": "tenant_77815e4c"
+    },
+    "createdAt": "2025-01-27T10:30:00.000Z",
+    "updatedAt": "2025-01-27T10:30:00.000Z",
+    "temporaryPassword": "ExampleCompany123"
+  }
+}
+```
+
 ### Get Tenant
 ```http
 GET /api/v1/tenants/{tenantId}
@@ -278,7 +297,6 @@ Content-Type: application/json
     "id": "uuid",
     "name": "Production API Key", 
     "apiKey": "kya_b8f7e4a1c9d6f2e8a5b3c7d9f1e4a6c8d2f5a7b9c3e6f8a1d4b7c9e2f5a8b1c4",
-    "keyHash": "hash",
     "status": "active",
     "expiresAt": "2025-12-31T23:59:59.000Z",
     "createdAt": "2025-01-27T10:30:00.000Z"
@@ -292,11 +310,49 @@ GET /api/v1/tenants/{tenantId}/api-keys
 Authorization: Bearer kya_admin_...
 ```
 
+Returns all keys including revoked ones. Each key includes non-sensitive preview fields.
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "tenantId": "uuid",
+      "name": "Production API Key",
+      "status": "active",
+      "expiresAt": "2026-01-01T00:00:00.000Z",
+      "lastUsedAt": "2025-01-27T12:00:00.000Z",
+      "createdAt": "2025-01-27T10:30:00.000Z",
+      "updatedAt": "2025-01-27T10:30:00.000Z",
+      "isActive": true,
+      "isExpired": false,
+      "maskedKey": "kya_****8b1c"
+    }
+  ]
+}
+```
+
 ### Revoke API Key
 ```http
 DELETE /api/v1/tenants/{tenantId}/api-keys/{apiKeyId}
 Authorization: Bearer kya_admin_...
 ```
+
+### Reveal Tenant API Key
+```http
+POST /api/v1/tenants/{tenantId}/api-keys/{apiKeyId}/reveal
+Authorization: Bearer kya_admin_...
+```
+
+**Response:**
+```json
+{ "success": true, "data": { "apiKey": "kya_..." } }
+```
+
+Notes:
+- Keys are encrypted at rest (AES-256-GCM); reveal decrypts the value on demand.
+- Listings never include raw keys; only maskedKey derived from a preview suffix.
 
 ### Get Tenant Statistics
 ```http
@@ -316,6 +372,15 @@ Authorization: Bearer kya_admin_...
     "lastVerificationAt": "2025-01-27T09:15:00.000Z"
   }
 }
+```
+
+### Admin: Tenant Users
+```http
+GET /api/v1/tenants/{tenantId}/users?page=1&limit=20
+Authorization: Bearer <admin-jwt>
+
+GET /api/v1/tenants/{tenantId}/users/{accountId}
+Authorization: Bearer <admin-jwt>
 ```
 
 ## Error Codes
@@ -398,8 +463,8 @@ curl -X POST http://localhost:3000/api/v1/tenants/TENANT_ID/api-keys \
 
 4. **Test tenant authentication:**
 ```bash
-curl -X GET http://localhost:3000/api/v1/tenants \
-  -H "Authorization: Bearer TENANT_API_KEY"
+curl -X GET http://localhost:3000/api/v1/verifications \
+  -H "X-API-Key: TENANT_API_KEY"
 ```
 
 ## KYC Verification Endpoints
@@ -438,6 +503,10 @@ Content-Type: application/json
 }
 ```
 
+Notes:
+- If imgbb is enabled via `IMGBB_API_KEY`, uploaded images are mirrored to imgbb and URLs are returned in `result.metadata.imageUrls`.
+- Admins can act as a tenant using `X-Tenant-Id: <tenant-uuid>` header on verification endpoints.
+
 ### Create Document Verification (File Upload)
 ```http
 POST /api/v1/verifications/upload
@@ -453,6 +522,8 @@ verificationType: document # Required: Verification type
 callbackUrl: https://yourapp.com/webhook
 metadata: {"custom": "data"}  # Optional: JSON string
 ```
+
+Tip: For mock provider simulation during development, pass `{"simulate": { "forceStatus": "failed" | "passed", "failureRate": 0.2, "poorImageQuality": true, "expiredDocument": true, "confidence": 42 }}` in the `metadata` object.
 
 ### Get Verification Status
 ```http
@@ -489,8 +560,17 @@ Response:
         "hologram": true,
         "uvFeatures": true
       }
+      },
+      "metadata": {
+        "imageUrls": {
+          "frontUrl": "https://i.ibb.co/...",
+          "backUrl": "https://i.ibb.co/...",
+          "selfieUrl": "https://i.ibb.co/..."
+        }
+      }
     }
-  }
+  },
+  "providerName": "regula-mock"
 }
 ```
 
@@ -499,6 +579,8 @@ Response:
 GET /api/v1/verifications?page=1&limit=20&status=completed
 Authorization: Bearer kya_...
 ```
+
+Admins can query tenant verifications by adding `X-Tenant-Id: <tenant-uuid>` header or `?tenantId=<tenant-uuid>` query param.
 
 ### Get Verified Users
 ```http

@@ -19,7 +19,6 @@ CREATE TABLE admins (
   password varchar(255), -- bcrypt hashed
   role varchar(50) DEFAULT 'admin' CHECK (role IN ('super_admin', 'admin', 'viewer')),
   status varchar(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
-  settings jsonb DEFAULT '{}',
   last_login_at timestamp with time zone,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now()
@@ -125,6 +124,9 @@ CREATE TABLE tenant_api_keys (
   status varchar(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'expired', 'revoked')),
   expires_at timestamp with time zone,
   last_used_at timestamp with time zone,
+  preview_suffix varchar(8), -- non-sensitive display suffix
+  key_encrypted text,        -- AES-256-GCM ciphertext
+  key_iv varchar(24),        -- base64 IV
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now()
 );
@@ -161,7 +163,75 @@ CREATE INDEX idx_tenant_refresh_tokens_tenant_id_is_revoked ON tenant_refresh_to
 
 ## Multi-Tenant KYC Entities
 
-> **Note**: These entities are ready for future KYC provider integration
+> Note: The current system uses `verifications` for KYC flows. The `inquiries`/`inquiry_templates` sections below are planned/future constructs.
+
+#### `providers`
+Registered KYC providers available in the system.
+
+```sql
+CREATE TABLE providers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name varchar(100) UNIQUE NOT NULL, -- e.g., 'regula-mock', 'persona'
+  capabilities jsonb DEFAULT '{}',
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+
+-- Indexes
+CREATE UNIQUE INDEX idx_providers_name ON providers(name);
+CREATE INDEX idx_providers_is_active ON providers(is_active);
+```
+
+#### `tenant_provider_configs`
+Per-tenant provider assignments and configurations.
+
+```sql
+CREATE TABLE tenant_provider_configs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  provider_id uuid NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+  config jsonb NOT NULL DEFAULT '{}',
+  is_primary boolean DEFAULT false,
+  priority integer DEFAULT 10,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  UNIQUE (tenant_id, provider_id)
+);
+
+-- Indexes
+CREATE INDEX idx_tpc_tenant ON tenant_provider_configs(tenant_id);
+CREATE INDEX idx_tpc_provider ON tenant_provider_configs(provider_id);
+CREATE INDEX idx_tpc_tenant_priority ON tenant_provider_configs(tenant_id, priority);
+```
+
+#### `verifications`
+KYC verifications processed via configured providers.
+
+```sql
+CREATE TABLE verifications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  account_id uuid REFERENCES accounts(id) ON DELETE SET NULL,
+  provider_name varchar(100) NOT NULL, -- e.g., 'regula-mock'
+  provider_verification_id varchar(255),
+  verification_type varchar(50) NOT NULL, -- document, biometric, comprehensive
+  processing_method varchar(50) DEFAULT 'direct', -- direct, external_link
+  status varchar(50) NOT NULL, -- pending, in_progress, completed, failed, expired, cancelled
+  expires_at timestamp with time zone,
+  result jsonb, -- standardized result
+  request_metadata jsonb,
+  response_metadata jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+
+-- Indexes
+CREATE INDEX idx_verifications_tenant ON verifications(tenant_id);
+CREATE INDEX idx_verifications_tenant_status ON verifications(tenant_id, status);
+CREATE INDEX idx_verifications_created_at ON verifications(created_at);
+CREATE INDEX idx_verifications_provider ON verifications(provider_name);
+```
 
 #### `accounts`
 KYC verification subjects (people being verified).
@@ -186,7 +256,7 @@ CREATE INDEX idx_accounts_tenant_id_reference_id ON accounts(tenant_id, referenc
 CREATE INDEX idx_accounts_tenant_id_email ON accounts(tenant_id, email);
 ```
 
-#### `inquiry_templates`
+#### `inquiry_templates` (Future)
 Verification flow templates for different use cases.
 
 ```sql
@@ -208,7 +278,7 @@ CREATE INDEX idx_inquiry_templates_tenant_id_is_active ON inquiry_templates(tena
 CREATE INDEX idx_inquiry_templates_provider ON inquiry_templates(provider);
 ```
 
-#### `inquiries`
+#### `inquiries` (Future)
 Verification sessions/flows.
 
 ```sql

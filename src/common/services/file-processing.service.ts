@@ -68,7 +68,8 @@ export class FileProcessingService {
     file: Express.Multer.File,
     options: FileProcessingOptions,
   ): Promise<ProcessedFile> {
-    const tempPath = await this.saveTemporaryFile(file);
+    // Prefer in-memory processing to avoid file locking issues on Windows
+    const tempPath = '';
 
     try {
       let processedBuffer: Buffer;
@@ -77,15 +78,15 @@ export class FileProcessingService {
       let height: number | undefined;
 
       if (this.isImageFile(file.mimetype)) {
-        // Process image with sharp
-        const result = await this.processImage(tempPath, options);
+        // Process image from memory buffer with sharp to avoid disk locks
+        const result = await this.processImageBuffer(file.buffer, options);
         processedBuffer = result.buffer;
         width = result.width;
         height = result.height;
         finalMimeType = options.convertToJpeg ? 'image/jpeg' : file.mimetype;
       } else {
-        // For non-image files (PDFs), read as-is
-        processedBuffer = await fs.readFile(tempPath);
+        // For non-image files (PDFs), use original buffer as-is
+        processedBuffer = file.buffer;
       }
 
       // Convert to base64
@@ -101,8 +102,7 @@ export class FileProcessingService {
         tempPath,
       };
     } catch (error) {
-      // Cleanup temp file on error
-      await this.cleanupFile(tempPath);
+      // No temp file to cleanup when using in-memory processing
       throw new BadRequestException(
         `Failed to process file "${file.originalname}": ${error.message}`,
       );
@@ -112,11 +112,11 @@ export class FileProcessingService {
   /**
    * Process image with optimization
    */
-  private async processImage(
-    filePath: string,
+  private async processImageBuffer(
+    input: Buffer,
     options: FileProcessingOptions,
   ): Promise<{ buffer: Buffer; width: number; height: number }> {
-    let pipeline = sharp(filePath);
+    let pipeline = sharp(input);
 
     // Get metadata
     const metadata = await pipeline.metadata();
@@ -133,9 +133,9 @@ export class FileProcessingService {
       });
 
       // Update dimensions after resize
-      const resizeInfo = await pipeline.clone().metadata();
-      width = resizeInfo.width;
-      height = resizeInfo.height;
+      const resizedMeta = await pipeline.clone().metadata();
+      width = resizedMeta.width;
+      height = resizedMeta.height;
     }
 
     // Convert format if requested
@@ -172,7 +172,10 @@ export class FileProcessingService {
    * Clean up temporary files
    */
   async cleanupFiles(files: ProcessedFile[]): Promise<void> {
-    const cleanupPromises = files.map((file) => this.cleanupFile(file.tempPath));
+    // Only attempt cleanup for files that wrote to disk (tempPath set)
+    const cleanupPromises = files
+      .filter((f) => f.tempPath)
+      .map((file) => this.cleanupFile(file.tempPath));
     await Promise.allSettled(cleanupPromises);
   }
 
@@ -180,12 +183,26 @@ export class FileProcessingService {
    * Clean up a single temporary file
    */
   private async cleanupFile(filePath: string): Promise<void> {
-    try {
-      await fs.unlink(filePath);
-      this.logger.debug(`Cleaned up temporary file: ${filePath}`);
-    } catch (error) {
-      this.logger.warn(`Failed to cleanup file ${filePath}: ${error.message}`);
-    }
+    if (!filePath) return;
+    const retry = async (retries = 5, delayMs = 200) => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          await fs.rm(filePath, { force: true });
+          this.logger.debug(`Cleaned up temporary file: ${filePath}`);
+          return;
+        } catch (error: any) {
+          const code = error?.code;
+          if (code === 'ENOENT') return; // already deleted
+          if (code !== 'EPERM' && code !== 'EBUSY') {
+            this.logger.warn(`Failed to cleanup file ${filePath}: ${error.message}`);
+            return;
+          }
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+      }
+      this.logger.warn(`Failed to cleanup file after retries: ${filePath}`);
+    };
+    await retry();
   }
 
   /**

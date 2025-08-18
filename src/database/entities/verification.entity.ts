@@ -96,10 +96,14 @@ export class Verification {
   @IsIn(Object.values(VerificationStatus))
   status: VerificationStatus;
 
-  @ApiProperty({ description: 'One-time verification link provided by the provider' })
-  @Column({ type: 'text', name: 'verification_link' })
+  @ApiProperty({
+    description: 'One-time verification link provided by the provider',
+    required: false,
+  })
+  @Column({ type: 'text', name: 'verification_link', nullable: true })
+  @IsOptional()
   @IsUrl()
-  verificationLink: string;
+  verificationLink?: string;
 
   @ApiProperty({ description: 'Tenant callback URL for verification completion', required: false })
   @Column({ type: 'varchar', length: 500, nullable: true, name: 'callback_url' })
@@ -118,17 +122,17 @@ export class Verification {
   result?: VerificationResult;
 
   @ApiProperty({ description: 'Request metadata and additional information' })
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'jsonb', name: 'request_metadata', default: {} })
   @IsOptional()
   requestMetadata: Record<string, any>;
 
   @ApiProperty({ description: 'Response metadata from provider' })
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'jsonb', name: 'response_metadata', default: {} })
   @IsOptional()
   responseMetadata: Record<string, any>;
 
   @ApiProperty({ description: 'Error details if verification failed' })
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'jsonb', name: 'error_details', nullable: true })
   @IsOptional()
   errorDetails?: {
     code: string;

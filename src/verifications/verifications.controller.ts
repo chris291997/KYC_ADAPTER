@@ -23,6 +23,7 @@ import {
   ApiBearerAuth,
   ApiSecurity,
   ApiConsumes,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { UseGuards } from '@nestjs/common';
 import { ApiKeyGuard } from '../auth/guards/api-key.guard';
@@ -50,6 +51,11 @@ export class VerificationsController {
   ) {}
 
   @Post()
+  @ApiHeader({
+    name: 'X-Tenant-Id',
+    required: false,
+    description: 'For admins only: act as the specified tenant when calling this endpoint',
+  })
   @ApiOperation({
     summary: 'Create Identity Verification (JSON)',
     description: `
@@ -208,6 +214,11 @@ export class VerificationsController {
   }
 
   @Post('upload')
+  @ApiHeader({
+    name: 'X-Tenant-Id',
+    required: false,
+    description: 'For admins only: act as the specified tenant when calling this endpoint',
+  })
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'front', maxCount: 1 },
@@ -369,6 +380,11 @@ export class VerificationsController {
    * Get verified users (accounts) for the tenant
    */
   @Get('users')
+  @ApiHeader({
+    name: 'X-Tenant-Id',
+    required: false,
+    description: 'For admins only: act as the specified tenant when calling this endpoint',
+  })
   @ApiOperation({
     summary: 'Get Verified Users',
     description: `
@@ -447,6 +463,11 @@ export class VerificationsController {
   }
 
   @Get(':verificationId')
+  @ApiHeader({
+    name: 'X-Tenant-Id',
+    required: false,
+    description: 'For admins only: act as the specified tenant when calling this endpoint',
+  })
   @ApiOperation({
     summary: 'Get Verification Status',
     description: `
@@ -492,6 +513,11 @@ export class VerificationsController {
   }
 
   @Get()
+  @ApiHeader({
+    name: 'X-Tenant-Id',
+    required: false,
+    description: 'For admins only: act as the specified tenant when calling this endpoint',
+  })
   @ApiOperation({
     summary: 'List Verifications',
     description: `

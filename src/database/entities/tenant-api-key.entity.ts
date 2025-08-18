@@ -39,6 +39,18 @@ export class TenantApiKey {
   keyHash: string;
 
   @ApiProperty({
+    description: 'Encrypted API key (base64, includes auth tag)',
+    writeOnly: true,
+    required: false,
+  })
+  @Column({ type: 'text', nullable: true, name: 'key_encrypted' })
+  keyEncrypted?: string;
+
+  @ApiProperty({ description: 'Encryption IV (base64)', writeOnly: true, required: false })
+  @Column({ type: 'varchar', length: 24, nullable: true, name: 'key_iv' })
+  keyIv?: string;
+
+  @ApiProperty({
     description: 'API key status',
     enum: ['active', 'inactive', 'expired', 'revoked'],
   })
@@ -60,6 +72,13 @@ export class TenantApiKey {
   @ApiProperty({ description: 'Last time this API key was used', required: false })
   @Column({ type: 'timestamp with time zone', nullable: true, name: 'last_used_at' })
   lastUsedAt?: Date;
+
+  @ApiProperty({
+    description: 'Non-sensitive preview suffix of the API key (e.g., last 4 chars)',
+    required: false,
+  })
+  @Column({ type: 'varchar', length: 8, nullable: true, name: 'preview_suffix' })
+  previewSuffix?: string;
 
   @ApiProperty({ description: 'API key creation timestamp' })
   @CreateDateColumn({ type: 'timestamp with time zone', name: 'created_at' })
