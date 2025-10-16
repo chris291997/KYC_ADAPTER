@@ -120,4 +120,16 @@ coverage/
 .nyc_output/
 
 # TypeScript
-*.tsbuildinfo 
+*.tsbuildinfo
+
+# Bull Queue artifacts
+.bull/
+bull-board.json
+queue-data/
+
+# Redis dump files
+dump.rdb
+appendonly.aof
+
+# WebSocket connection logs
+websocket-logs/ 

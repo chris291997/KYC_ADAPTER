@@ -8,14 +8,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Persona KYC provider integration  
-- Biometric verification endpoints
-- Webhook system for provider callbacks
-- Dashboard analytics and reporting
-- File upload handling with AWS S3
-- One-time verification links
-- Frontend demo application
-- Real-time verification status updates
+- External provider HTTP client implementation (Day 2)
+- Template synchronization service (Day 2)
+- Queue processor for async verifications (Day 3)
+- WebSocket gateway for real-time updates (Day 3)
+- Async verification endpoint (Day 3)
+- Webhook dispatcher service (Day 3)
+- Provider registration and factory integration (Day 4)
+- End-to-end integration testing (Day 5)
+- Comprehensive unit tests and documentation (Day 5)
+
+## [1.2.0] - 2025-01-17
+
+### Added - Event-Driven Architecture Foundation
+
+#### Infrastructure & Dependencies
+- **Redis Integration**: Added Redis for queue management, event bus, and caching
+  - Configured Bull queue for async job processing
+  - Redis Pub/Sub for event-driven messaging
+  - Persistent storage with AOF (Append-Only File)
+- **WebSocket Support**: Installed Socket.IO infrastructure for real-time client updates
+  - `@nestjs/websockets` and `@nestjs/platform-socket.io` for NestJS integration
+  - `socket.io` for bi-directional real-time communication
+- **Queue Management**: Integrated Bull with Redis for background job processing
+  - `@nestjs/bull`, `bull`, and `ioredis` packages
+  - Configurable concurrency, retries, and job timeouts
+
+#### Database Schema - Multi-Step Provider Support
+- **New Tables**:
+  - `provider_templates`: Stores verification workflow templates with steps configuration
+    - Supports template-based verification flows
+    - Tracks active templates and metadata per provider
+  - `provider_plans`: Verification plans, pricing, and features
+    - Plan codes, categories, and pricing information
+    - Plan-specific metadata and configurations
+  - `provider_verification_sessions`: Async progress tracking for multi-step workflows
+    - Real-time progress tracking (current_step, total_steps, percentage)
+    - Processing step log with timestamps and status
+    - Session lifecycle management (created → in_progress → completed/failed)
+
+- **Enhanced `verifications` Table** (6 new columns):
+  - `template_id`: Links verification to specific provider template
+  - `processing_mode`: Sync vs async processing (`sync` | `async`)
+  - `is_multi_step`: Boolean flag for multi-step workflow detection
+  - `verification_method`: Type of verification (`document` | `id_based` | `biometric`)
+  - `job_id`: Reference to Bull queue job for async processing
+  - `webhook_url`: Callback URL for completion notifications
+
+- **Enhanced `providers` Table** (4 new columns):
+  - `supports_templates`: Provider uses template-based workflows
+  - `supports_id_verification`: Direct ID-based verification capability (government database lookups)
+  - `supports_async`: Asynchronous processing support
+  - `processing_mode`: Provider's processing paradigm (`single_step` | `multi_step` | `async_webhook`)
+
+#### TypeORM Entities
+- **ProviderTemplate Entity**: Full ORM mapping for provider templates
+  - Relationships to Provider and ProviderVerificationSession
+  - Validation for template steps and configuration
+- **ProviderPlan Entity**: Plan management and pricing
+  - Plan code uniqueness per provider
+  - Active/inactive plan tracking
+- **ProviderVerificationSession Entity**: Session state management
+  - Progress calculation and tracking
+  - Status transitions with timestamps
+  - One-to-one relationship with Verification
+
+#### Configuration & Environment
+- **WebSocket Configuration**:
+  - `WEBSOCKET_CORS_ORIGIN`: Cross-origin resource sharing for WebSocket connections
+  - `WEBSOCKET_PORT`: Dedicated port for WebSocket server (default: 3001)
+  - `WEBSOCKET_PATH`: Socket.IO path configuration
+- **Queue Configuration**:
+  - `QUEUE_VERIFICATION_CONCURRENCY`: Concurrent job processing limit (default: 5)
+  - `QUEUE_MAX_RETRIES`: Maximum retry attempts for failed jobs (default: 3)
+  - `QUEUE_JOB_TIMEOUT`: Job timeout in milliseconds (default: 300000 / 5 minutes)
+- **Provider API Settings**:
+  - `PROVIDER_API_URL`: External provider API base URL
+  - `PROVIDER_API_KEY`: Authentication key for provider
+  - `PROVIDER_COMPANY_ID`: Company identifier for provider
+  - `PROVIDER_TIMEOUT`: API request timeout (default: 30000ms)
+
+### Changed
+- **Docker Compose**: Updated Redis service with persistence configuration
+  - Added `appendonly yes` and `appendfsync everysec` for data durability
+  - Health check configuration for Redis availability
+- **`.gitignore`**: Added entries for queue artifacts and Redis dumps
+  - `.bull/`, `bull-board.json`, `queue-data/`
+  - `dump.rdb`, `appendonly.aof`
+  - `websocket-logs/`
+
+### Technical Details
+- **Migration**: `1753700000000-AddEventDrivenArchitecture.ts`
+  - Comprehensive schema changes with proper indexes
+  - Foreign key constraints for referential integrity
+  - Reversible migration with full rollback support
+- **Services Running**:
+  - Redis: `localhost:6379` (Docker)
+  - PostgreSQL: `localhost:5432` (Local installation)
+
+### Documentation
+- Updated `IDMETA_DEVELOPMENT_PLAN.md` with event-driven architecture tasks
+- Updated `IDMETA_INTEGRATION_DOCUMENTATION.md` with async processing flows
+- Updated `QUICK_START_GUIDE.md` with event-driven patterns and setup
+
+### Notes
+- This release establishes the foundation for async, event-driven verification processing
+- Backward compatible with existing synchronous verification flows
+- Enables future integration of multi-step, template-based verification providers
+- Supports real-time progress updates to connected clients via WebSocket
+- Database schema ready for Day 2-5 implementation tasks
 
 ## [1.1.0] - 2025-01-28
 

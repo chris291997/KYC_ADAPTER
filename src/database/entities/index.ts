@@ -26,6 +26,9 @@ export * from './webhook-delivery.entity';
 // Provider entities
 export * from './provider.entity';
 export * from './provider-config.entity';
+export * from './provider-template.entity';
+export * from './provider-plan.entity';
+export * from './provider-verification-session.entity';
 
 // Legacy provider entities (will be deprecated)
 export * from './provider-credential.entity';
