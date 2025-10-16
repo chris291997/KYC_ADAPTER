@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### In Progress (Day 3)
+- External provider HTTP client implementation
+- Template synchronization service
+- Session service for progress tracking
+
 ### Planned
-- External provider HTTP client implementation (Day 2)
-- Template synchronization service (Day 2)
 - Queue processor for async verifications (Day 3)
 - WebSocket gateway for real-time updates (Day 3)
 - Async verification endpoint (Day 3)
@@ -20,7 +23,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.0] - 2025-01-17
 
-### Added - Event-Driven Architecture Foundation
+### Added - Event-Driven Architecture (Days 1-2)
+
+#### Day 2: TypeScript Types & Queue Infrastructure (2025-01-17)
+
+**Enhanced Provider Types**
+- **`async-provider.types.ts`**: Comprehensive types for async and multi-step workflows
+  - `ProcessingMode` enum: `SINGLE_STEP`, `MULTI_STEP`, `ASYNC_WEBHOOK`
+  - `VerificationMethod` enum: `DOCUMENT`, `ID_BASED`, `BIOMETRIC`, `AML`, `COMPREHENSIVE`
+  - `ProviderSessionStatus` enum: Session lifecycle states (renamed to avoid conflicts)
+  - `TemplateStepType` enum: 8 verification step types
+  - 15+ interfaces: `ProviderTemplate`, `ProviderPlan`, `CreateSessionResponse`, `AsyncJobResponse`, `VerificationProgress`, `IdBasedVerificationRequest`, etc.
+
+**Event System**
+- **`verification.events.ts`**: Complete event type system
+  - 12 event types: Created, Started, Progress, Step Started/Completed/Failed, Completed, Failed, Expired, Canceled, Webhook Dispatched, Template Synced
+  - Event channels with constants (`EVENT_CHANNELS`)
+  - Event priority levels and metadata
+  - Type-safe event payloads with correlation/causation IDs
+
+**Provider Interface Extensions**
+- **Updated `IKycProvider`**: Backward-compatible async support
+  - Added `processingMode: ProcessingMode` (required property)
+  - Added `capabilities?: AsyncProviderCapabilities` (optional)
+  - 8 new optional methods:
+    - `getTemplates()` - Fetch available templates
+    - `getPlans()` - Fetch verification plans
+    - `createTemplateSession()` - Start multi-step workflow
+    - `executeStep()` - Run individual verification steps
+    - `finalizeSession()` - Complete multi-step verification
+    - `verifyById()` - ID-based verification (no document upload)
+    - `createAsyncVerification()` - Queue async job
+    - `getJobStatus()` - Poll job status
+- Updated existing providers (`RegulaProvider`, `MockRegulaProvider`) with `processingMode = SINGLE_STEP`
+
+**Queue Infrastructure**
+- **`QueueModule`**: Bull queue configuration with Redis
+  - Verifications queue with exponential backoff (2s initial delay)
+  - Job retention: 1 hour for completed, 24 hours for failed
+  - Stalled job detection (30s interval)
+  - Configurable attempts, timeout, and concurrency
+- Integrated into `AppModule` as global module
+
+**Event Bus Service**
+- **`EventBusService`**: Redis Pub/Sub for event-driven messaging
+  - Dual Redis connections (publisher + subscriber)
+  - Channel and pattern-based subscriptions
+  - Type-safe event publishing with metadata
+  - Helper methods for common verification events
+  - Auto-initialization and cleanup lifecycle hooks
+  - Health check endpoint
+- Registered as global service in `CommonModule`
+
+**Configuration System**
+- **`provider.config.ts`**: Provider API configuration with validation
+  - 10 validated properties: API URL, key, company ID, timeout, retries, caching
+  - Class-validator decorators for runtime validation
+  - ConfigService integration
+- **`async-verification.config.ts`**: Async processing configuration
+  - 8 validated properties: Webhooks, queue, real-time updates, job settings
+  - Webhook retry strategy configuration
+  - Progress update interval settings
+
+**Bug Fixes**
+- Fixed `SessionStatus` enum naming conflict between `inquiry-session.entity` and `provider-verification-session.entity`
+  - Renamed provider enum to `ProviderSessionStatus`
+  - Updated all references in entities, types, and events
+- Added `processingMode` property to existing provider implementations to satisfy updated interface
+
+**Build & Quality**
+- ✅ Zero linter errors
+- ✅ Successful TypeScript compilation
+- ✅ All new modules properly registered in `AppModule`
+- ✅ Backward compatibility maintained for existing providers
+
+### Added - Event-Driven Architecture Foundation (Day 1)
 
 #### Infrastructure & Dependencies
 - **Redis Integration**: Added Redis for queue management, event bus, and caching

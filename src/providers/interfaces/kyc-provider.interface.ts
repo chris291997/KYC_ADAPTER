@@ -6,10 +6,21 @@ import {
   ProviderCredentials,
   ProviderConfig,
 } from '../types/provider.types';
+import {
+  ProcessingMode,
+  ProviderTemplate,
+  ProviderPlan,
+  CreateTemplateSessionRequest,
+  CreateSessionResponse,
+  IdBasedVerificationRequest,
+  AsyncJobResponse,
+  AsyncProviderCapabilities,
+} from '../types/async-provider.types';
 
 /**
  * Interface that all KYC providers must implement
  * Provides a unified API for different verification providers
+ * Extended to support async, multi-step, and template-based workflows
  */
 export interface IKycProvider {
   /**
@@ -21,6 +32,16 @@ export interface IKycProvider {
    * Provider type (regula, persona, etc.)
    */
   readonly type: string;
+
+  /**
+   * Provider processing mode
+   */
+  readonly processingMode: ProcessingMode;
+
+  /**
+   * Provider capabilities (optional - for runtime capability checks)
+   */
+  readonly capabilities?: AsyncProviderCapabilities;
 
   /**
    * Initialize the provider with credentials and configuration
@@ -64,6 +85,64 @@ export interface IKycProvider {
    * Validate provider credentials
    */
   validateCredentials(): Promise<boolean>;
+
+  // ===== Async & Multi-Step Methods (Optional - implement if supported) =====
+
+  /**
+   * Get available templates for template-based verification
+   * @returns List of available templates
+   */
+  getTemplates?(): Promise<ProviderTemplate[]>;
+
+  /**
+   * Get available verification plans
+   * @returns List of available plans
+   */
+  getPlans?(): Promise<ProviderPlan[]>;
+
+  /**
+   * Create a template-based verification session
+   * @param request Session creation request
+   * @returns Session details
+   */
+  createTemplateSession?(request: CreateTemplateSessionRequest): Promise<CreateSessionResponse>;
+
+  /**
+   * Execute a verification step in a multi-step workflow
+   * @param sessionId Provider session ID
+   * @param stepType Step to execute
+   * @param stepData Data for the step
+   * @returns Step execution result
+   */
+  executeStep?(sessionId: string, stepType: string, stepData: any): Promise<any>;
+
+  /**
+   * Finalize a multi-step verification session
+   * @param sessionId Provider session ID
+   * @returns Final verification result
+   */
+  finalizeSession?(sessionId: string): Promise<VerificationStatusResponse>;
+
+  /**
+   * Perform ID-based verification without document upload
+   * @param request ID verification request
+   * @returns Verification result
+   */
+  verifyById?(request: IdBasedVerificationRequest): Promise<VerificationResponse>;
+
+  /**
+   * Create an async verification job
+   * @param request Verification request
+   * @returns Job details with status URL
+   */
+  createAsyncVerification?(request: VerificationRequest): Promise<AsyncJobResponse>;
+
+  /**
+   * Get job status for async verification
+   * @param jobId Job identifier
+   * @returns Current job status
+   */
+  getJobStatus?(jobId: string): Promise<AsyncJobResponse>;
 }
 
 /**

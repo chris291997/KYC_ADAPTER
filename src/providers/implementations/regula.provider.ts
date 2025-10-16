@@ -15,6 +15,7 @@ import {
   RegulaLightSource,
   RegulaSpecificResult,
 } from '../types/provider.types';
+import { ProcessingMode } from '../types/async-provider.types';
 
 /**
  * Accurate implementation of Regula Document Reader SDK
@@ -31,6 +32,7 @@ export class RegulaProvider implements IKycProvider {
 
   readonly name = 'Regula Document Reader SDK';
   readonly type = 'regula';
+  readonly processingMode = ProcessingMode.SINGLE_STEP;
 
   async initialize(credentials: ProviderCredentials, config?: ProviderConfig): Promise<void> {
     this.logger.log('Initializing Regula Provider');
