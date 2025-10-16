@@ -24,7 +24,7 @@ import { Provider } from './provider.entity';
 import { Verification } from './verification.entity';
 import { ProviderTemplate } from './provider-template.entity';
 
-export enum SessionStatus {
+export enum ProviderSessionStatus {
   PENDING = 'pending',
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
@@ -92,16 +92,16 @@ export class ProviderVerificationSession {
 
   @ApiProperty({
     description: 'Session status',
-    enum: SessionStatus,
+    enum: ProviderSessionStatus,
   })
   @Column({
     type: 'varchar',
     length: 50,
-    default: SessionStatus.PENDING,
-    enum: Object.values(SessionStatus),
+    default: ProviderSessionStatus.PENDING,
+    enum: Object.values(ProviderSessionStatus),
   })
-  @IsIn(Object.values(SessionStatus))
-  status: SessionStatus;
+  @IsIn(Object.values(ProviderSessionStatus))
+  status: ProviderSessionStatus;
 
   @ApiProperty({ description: 'Detailed step execution log' })
   @Column({ type: 'jsonb', name: 'processing_steps', default: [] })
@@ -198,7 +198,7 @@ export class ProviderVerificationSession {
   }
 
   markCompleted(): void {
-    this.status = SessionStatus.COMPLETED;
+    this.status = ProviderSessionStatus.COMPLETED;
     this.completedAt = new Date();
     this.currentStep = this.totalSteps;
     this.progressPercentage = 100;
@@ -210,7 +210,7 @@ export class ProviderVerificationSession {
     step?: number;
     details?: Record<string, any>;
   }): void {
-    this.status = SessionStatus.FAILED;
+    this.status = ProviderSessionStatus.FAILED;
     this.failedAt = new Date();
     this.errorDetails = error;
   }
@@ -222,18 +222,18 @@ export class ProviderVerificationSession {
   }
 
   isCompleted(): boolean {
-    return this.status === SessionStatus.COMPLETED;
+    return this.status === ProviderSessionStatus.COMPLETED;
   }
 
   isFailed(): boolean {
-    return this.status === SessionStatus.FAILED;
+    return this.status === ProviderSessionStatus.FAILED;
   }
 
   isInProgress(): boolean {
-    return this.status === SessionStatus.IN_PROGRESS;
+    return this.status === ProviderSessionStatus.IN_PROGRESS;
   }
 
   isPending(): boolean {
-    return this.status === SessionStatus.PENDING;
+    return this.status === ProviderSessionStatus.PENDING;
   }
 }
