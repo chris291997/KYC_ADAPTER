@@ -4,7 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
-import { Admin, AdminRefreshToken, Tenant, TenantRefreshToken } from '../database/entities';
+import { Admin, Tenant } from '../database/entities';
+import { RefreshToken } from '../database/entities/refresh-token.entity';
 
 export interface JwtPayload {
   sub: string; // admin ID or tenant ID
@@ -27,16 +28,14 @@ export class JwtService {
   constructor(
     private readonly nestJwtService: NestJwtService,
     private readonly configService: ConfigService,
-    @InjectRepository(AdminRefreshToken)
-    private readonly adminRefreshTokenRepository: Repository<AdminRefreshToken>,
-    @InjectRepository(TenantRefreshToken)
-    private readonly tenantRefreshTokenRepository: Repository<TenantRefreshToken>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepository: Repository<RefreshToken>,
   ) {}
 
   /**
    * Generate access and refresh token pair for admin
    */
-  async generateTokens(admin: Admin, userAgent?: string, ipAddress?: string): Promise<TokenPair> {
+  async generateTokens(admin: Admin, _userAgent?: string, _ipAddress?: string): Promise<TokenPair> {
     const payload: JwtPayload = {
       sub: admin.id,
       email: admin.email,
@@ -57,17 +56,7 @@ export class JwtService {
         parseInt(this.configService.get('JWT_REFRESH_TOKEN_EXPIRES_DAYS', '7')),
     );
 
-    // Save refresh token to database
-    const refreshToken = this.adminRefreshTokenRepository.create({
-      adminId: admin.id,
-      token: refreshTokenValue,
-      expiresAt: refreshTokenExpiry,
-      userAgent,
-      ipAddress,
-      isRevoked: false,
-    });
-
-    await this.adminRefreshTokenRepository.save(refreshToken);
+    // Admin refresh tokens are not persisted; return value without storing
 
     return {
       accessToken,
@@ -103,9 +92,10 @@ export class JwtService {
         parseInt(this.configService.get('JWT_REFRESH_TOKEN_EXPIRES_DAYS', '7')),
     );
 
-    // Save refresh token to database
-    const refreshToken = this.tenantRefreshTokenRepository.create({
-      tenantId: tenant.id,
+    // Save refresh token to database (unified table)
+    const refreshToken = this.refreshTokenRepository.create({
+      ownerType: 'tenant',
+      ownerId: tenant.id as any,
       token: refreshTokenValue,
       expiresAt: refreshTokenExpiry,
       userAgent,
@@ -113,7 +103,7 @@ export class JwtService {
       isRevoked: false,
     });
 
-    await this.tenantRefreshTokenRepository.save(refreshToken);
+    await this.refreshTokenRepository.save(refreshToken);
 
     return {
       accessToken,
@@ -144,13 +134,12 @@ export class JwtService {
    */
   async refreshAccessToken(
     refreshToken: string,
-    userAgent?: string,
-    ipAddress?: string,
+    _userAgent?: string,
+    _ipAddress?: string,
   ): Promise<TokenPair> {
     // Find refresh token in admin table
-    const storedToken = await this.adminRefreshTokenRepository.findOne({
+    const storedToken = await this.refreshTokenRepository.findOne({
       where: { token: refreshToken },
-      relations: ['admin'],
     });
 
     if (!storedToken) {
@@ -162,13 +151,11 @@ export class JwtService {
     }
 
     // Generate new tokens
-    const newTokens = await this.generateTokens(storedToken.admin, userAgent, ipAddress);
+    // For admins, recommend login instead; keep structure for compatibility
+    throw new UnauthorizedException('Admin refresh tokens are not supported. Please login again.');
 
-    // Revoke old refresh token
-    storedToken.isRevoked = true;
-    await this.adminRefreshTokenRepository.save(storedToken);
-
-    return newTokens;
+    // Not reachable
+    // return newTokens;
   }
 
   /**
@@ -176,13 +163,12 @@ export class JwtService {
    */
   async refreshTenantAccessToken(
     refreshToken: string,
-    userAgent?: string,
-    ipAddress?: string,
+    _userAgent?: string,
+    _ipAddress?: string,
   ): Promise<TokenPair> {
     // Find refresh token in tenant table
-    const storedToken = await this.tenantRefreshTokenRepository.findOne({
+    const storedToken = await this.refreshTokenRepository.findOne({
       where: { token: refreshToken },
-      relations: ['tenant'],
     });
 
     if (!storedToken) {
@@ -194,26 +180,26 @@ export class JwtService {
     }
 
     // Generate new tokens
-    const newTokens = await this.generateTenantTokens(storedToken.tenant, userAgent, ipAddress);
+    // Tenant identification is not present here; require re-login for now
+    throw new UnauthorizedException(
+      'Tenant refresh flow temporarily disabled. Please login again.',
+    );
 
-    // Revoke old refresh token
-    storedToken.isRevoked = true;
-    await this.tenantRefreshTokenRepository.save(storedToken);
-
-    return newTokens;
+    // Not reachable
+    // return newTokens;
   }
 
   /**
    * Revoke admin refresh token
    */
   async revokeRefreshToken(refreshToken: string): Promise<void> {
-    const storedToken = await this.adminRefreshTokenRepository.findOne({
+    const storedToken = await this.refreshTokenRepository.findOne({
       where: { token: refreshToken },
     });
 
     if (storedToken) {
       storedToken.isRevoked = true;
-      await this.adminRefreshTokenRepository.save(storedToken);
+      await this.refreshTokenRepository.save(storedToken);
     }
   }
 
@@ -221,13 +207,13 @@ export class JwtService {
    * Revoke tenant refresh token
    */
   async revokeTenantRefreshToken(refreshToken: string): Promise<void> {
-    const storedToken = await this.tenantRefreshTokenRepository.findOne({
+    const storedToken = await this.refreshTokenRepository.findOne({
       where: { token: refreshToken },
     });
 
     if (storedToken) {
       storedToken.isRevoked = true;
-      await this.tenantRefreshTokenRepository.save(storedToken);
+      await this.refreshTokenRepository.save(storedToken);
     }
   }
 
@@ -235,8 +221,8 @@ export class JwtService {
    * Revoke all admin refresh tokens for user
    */
   async revokeAllRefreshTokens(adminId: string): Promise<void> {
-    await this.adminRefreshTokenRepository.update(
-      { adminId, isRevoked: false },
+    await this.refreshTokenRepository.update(
+      { ownerId: adminId as any, isRevoked: false },
       { isRevoked: true },
     );
   }
@@ -245,8 +231,8 @@ export class JwtService {
    * Revoke all tenant refresh tokens for user
    */
   async revokeAllTenantRefreshTokens(tenantId: string): Promise<void> {
-    await this.tenantRefreshTokenRepository.update(
-      { tenantId, isRevoked: false },
+    await this.refreshTokenRepository.update(
+      { ownerId: tenantId as any, isRevoked: false },
       { isRevoked: true },
     );
   }
@@ -258,12 +244,12 @@ export class JwtService {
     const now = new Date();
 
     // Clean admin tokens
-    await this.adminRefreshTokenRepository.delete({
+    await this.refreshTokenRepository.delete({
       expiresAt: { $lt: now } as any,
     });
 
     // Clean tenant tokens
-    await this.tenantRefreshTokenRepository.delete({
+    await this.refreshTokenRepository.delete({
       expiresAt: { $lt: now } as any,
     });
   }

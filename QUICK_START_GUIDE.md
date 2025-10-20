@@ -1,165 +1,149 @@
-# Verification Provider Integration - Quick Start Guide
+# External KYC Provider Integration - Quick Start Guide
 
-> **TL;DR:** Template-First + event-driven (async queue + WebSockets), 3-week timeline, zero breaking changes
+> **TL;DR:** Webhook-driven integration, 2-week timeline, zero breaking changes, provider-agnostic design
 
 ---
 
 ## 📚 Document Overview
 
-### 1. **IDMETA_INTEGRATION_DOCUMENTATION.md**
+### 1. **EXTERNAL_PROVIDER_INTEGRATION.md**
 **When to read:** Before coding, for reference during development
 
 **What's inside:**
-- ✅ Technical architecture and design patterns (event-driven)
-- ✅ Provider-agnostic API specifications and examples
-- ✅ Complete database schema with migrations
+- ✅ Complete provider API specification
+- ✅ Webhook-driven architecture design
+- ✅ Database schema (minimal changes)
 - ✅ Provider implementation details
 - ✅ Security, testing, and deployment guides
 
 **Key sections:**
-- **Section 2:** Provider Overview (understand the external provider)
-- **Section 3:** Architecture Design (how it fits in)
-- **Section 5:** Database Schema (what to create)
-- **Section 6:** Provider Implementation (code structure)
+- **Section 2:** Provider API Overview
+- **Section 3:** Architecture Design (webhook-driven model)
+- **Section 5:** Database Schema
+- **Section 6:** Provider Implementation
+- **Section 7:** Webhook Integration
 
 ---
 
-### 2. **IDMETA_DEVELOPMENT_PLAN.md**
+### 2. **DEVELOPMENT_PLAN.md**
 **When to read:** Daily during implementation
 
 **What's inside:**
-- ✅ 3-week step-by-step implementation plan (async queue + WebSockets)
+- ✅ 2-week step-by-step implementation plan
 - ✅ Task breakdown with time estimates
-- ✅ Detailed acceptance criteria for each task
-- ✅ Risk management and mitigation strategies
-- ✅ Deployment checklist and success criteria
+- ✅ Detailed acceptance criteria
+- ✅ Risk management and mitigation
+- ✅ Deployment checklist
 
 **Key sections:**
-- **Section 3:** Task Breakdown (what to build)
-- **Section 4:** Day-by-Day Plan (when to build it)
-- **Section 7:** Success Criteria (how to know it's done)
+- **Section 3:** Task Breakdown
+- **Section 4:** Day-by-Day Plan
+- **Section 7:** Success Criteria
 
 ---
 
 ## 🎯 Critical Decisions Made
 
-### Why Template-First?
+### Why Webhook-Driven?
 
-| Template-First | Hybrid (Alternative) |
-|----------------|----------------------|
-| ✅ 2-3 weeks | ❌ 4-5 weeks |
-| ✅ Use provider templates | ⚠️ Build custom workflow engine |
-| ✅ Simpler testing | ❌ Complex validation |
-| ✅ Can upgrade later | ✅ More flexible from day 1 |
+**Modern Provider Architecture:**
+```
+Client → Create Verification → Provider processes internally →
+Provider sends webhooks → We update status → Client polls
+```
 
-**Decision:** Template-First wins for faster time-to-market.
+| Webhook-Driven (Chosen) | Multi-Step Orchestration |
+|--------------------------|--------------------------|
+| ✅ 2 weeks | ❌ 3 weeks |
+| ✅ Simpler integration | ❌ Complex workflow engine |
+| ✅ Provider handles complexity | ❌ We orchestrate steps |
+| ✅ Real-time via webhooks | ⚠️ Real-time via polling |
 
 ---
 
-### Key Architectural Patterns (Updated)
- 
-#### 1. **Adapter Pattern**
+### Key Architectural Patterns
+
+#### 1. **Webhook Handler Pattern**
 ```
-Client → Single API call → ProviderAdapter (handles multi-step internally) → Response
+Provider API → Sends webhook → Our handler validates → Updates DB → Client polls
 ```
 
-**Why:** Client API stays unchanged, complexity hidden.
-
-#### 2. **Template Caching**
+#### 2. **Provider Abstraction**
 ```
-Database (24h cache) → Fast lookups → No API call per verification
+VerificationsService → ProvidersFactory → [Regula | External | Future]
 ```
 
-**Why:** Performance + works when the external provider API is down.
-
-#### 3. **Provider Abstraction**
+#### 3. **Hosted Workflow Option**
 ```
-VerificationsService → ProvidersFactory → [Provider A | Provider B | Future]
+Client → API returns workflow_url → User completes on Provider UI → Webhook notifies us
 ```
-
-**Why:** Generic design supports multiple providers.
-
-#### 4. **Event-Driven Processing (NEW)**
-```
-Client → POST /verifications (202 Accepted) → Job queued → Worker executes steps →
-Events published to event bus → WebSocket gateway pushes real-time updates →
-Client listens via WebSocket or falls back to polling
-```
-
-**Why:**
-- Real-time UX with progress
-- Scales better than synchronous processing
-- Resilient to provider latency/failures
 
 ---
 
 ## 🗂️ What Gets Built
 
-### New Database Tables
+### New Database Columns
 
-1. **`provider_templates`** - Cached templates from external provider
-2. **`provider_plans`** - Available verification types
-3. **`provider_verification_sessions`** - Track multi-step workflows
+**`verifications` table:**
+- `external_verification_id` - Provider's verification ID
+- `external_workflow_url` - URL for hosted verification flow
+- `external_template_id` - Template used
+- `webhook_received_at` - Last webhook timestamp
+- `last_webhook_event` - Last event type
+
+**`providers` table:**
+- `supports_webhooks` - Provider sends webhooks
+- `supports_hosted_workflow` - Provider offers UI
+- `webhook_secret` - Secret for signature verification
+
+### New Tables (Optional)
+
+1. **`provider_templates`** - Cached templates
+2. **`webhook_logs`** - Audit trail
 
 ### New Code Files
 
 ```
 src/providers/implementations/external/
-├── external.provider.ts         ← Main provider adapter
-├── services/
-│   ├── template.service.ts      ← Template sync & caching
-│   └── session.service.ts       ← Multi-step state management
-├── clients/
-│   └── provider-http.client.ts  ← API communication
+├── external.provider.ts              ← Main provider adapter
+├── external-http.client.ts           ← API communication
 ├── mappers/
-│   ├── request.mapper.ts        ← Map our format → provider API
-│   └── response.mapper.ts       ← Map provider → our format
-└── repositories/
-    ├── template.repository.ts
-    ├── plan.repository.ts
-    └── session.repository.ts
+│   ├── request.mapper.ts             ← Map our format → Provider
+│   └── response.mapper.ts            ← Map Provider → our format
+└── types/
+    ├── provider-api.types.ts         ← Provider API types
+    └── provider-webhook.types.ts     ← Webhook payload types
+
+src/webhooks/
+├── provider-webhook.controller.ts    ← Webhook endpoint
+├── provider-webhook.service.ts       ← Webhook processing
+└── types/
+    └── webhook-events.ts             ← Event type definitions
 ```
-
-### Modified Files
-
-- `src/providers/interfaces/kyc-provider.interface.ts` - Add optional methods
-- `src/providers/types/provider.types.ts` - Add provider-agnostic types
-- `src/verifications/verifications.service.ts` - Handle provider adapter
-- `src/verifications/verifications.controller.ts` - Add ID-based endpoint
 
 ---
 
-## 📅 Implementation Timeline (Updated)
+## 📅 Implementation Timeline
 
-### Week 1: Foundation (Async Core)
-
-| Day | Focus | Deliverable |
-|-----|-------|-------------|
-| Mon | Database & Types | Migrations ready (sessions, events) |
-| Tue | Queue setup (Bull/Redis) | Queue running, jobs queued |
-| Wed | Worker + step engine | Steps execute from jobs |
-| Thu | Event bus (Redis Pub/Sub) | Progress events emitted |
-| Fri | Persisted progress | Status API returns progress |
-
-### Week 2: Real-Time Layer
+### Week 1: Foundation & Core Integration
 
 | Day | Focus | Deliverable |
 |-----|-------|-------------|
-| Mon | WebSocket gateway | Clients can subscribe/unsubscribe |
-| Tue | Progress streaming | Real-time updates end-to-end |
-| Wed | Client fallback | Polling fallback + samples |
-| Thu | Hardening | Retries, backoff, idempotency |
-| Fri | Perf + load tests | Baselines captured |
+| Mon | Database & HTTP Client | Migrations + HTTP client ready |
+| Tue | Provider Adapter | Provider implementation |
+| Wed | Request/Response Mappers | Data transformation working |
+| Thu | Webhook Handler | Webhook endpoint + processing |
+| Fri | Testing & Debugging | Unit tests passing |
 
-### Week 3: Integration & Hardening
+### Week 2: Integration & Deployment
 
 | Day | Focus | Deliverable |
 |-----|-------|-------------|
-| Mon | Provider registration | Provider metadata + seeds |
-| Tue | Admin/CLI tasks | Template sync job + CLI |
-| Wed | Webhook dispatcher | Signed callbacks on completion |
-| Thu | Docs & examples | Swagger, Postman, README |
-| Fri | Release prep | Checklists, rollout plan |
+| Mon | Provider Registration | Provider in factory + DB seeds |
+| Tue | Integration Testing | E2E tests with test account |
+| Wed | Documentation | API docs + examples |
+| Thu | Security Hardening | Signature verification + audit logs |
+| Fri | Deployment | Staging deployment + smoke tests |
 
 ---
 
@@ -167,42 +151,45 @@ src/providers/implementations/external/
 
 ### Prerequisites
 
-1. **Get External Provider Credentials:**
+1. **Get Provider Credentials:**
    ```
-   Contact: support@idmetagroup.com
-   Need: API Token, Base URL, Test Account
+   Contact: Provider support
+   Need: API Key, Webhook Secret, Test Account
+   Dashboard: Provider dashboard URL
    ```
 
-2. **Review Documents:**
-   - [ ] Skim `IDMETA_INTEGRATION_DOCUMENTATION.md`
-   - [ ] Read `IDMETA_DEVELOPMENT_PLAN.md` Day 1 section
+2. **Review Provider API Documentation:**
+   - [ ] Read provider's API docs
+   - [ ] Skim `EXTERNAL_PROVIDER_INTEGRATION.md`
+   - [ ] Read `DEVELOPMENT_PLAN.md` Day 1 section
 
 3. **Setup Environment:**
    ```bash
    # Add to .env
-   PROVIDER_API_TOKEN=your_token_here
-   PROVIDER_API_URL=https://provider-api.example.com
+   EXTERNAL_PROVIDER_API_KEY=your_api_key_here
+   EXTERNAL_PROVIDER_API_URL=https://provider-api.com/api/v1
+   EXTERNAL_PROVIDER_WEBHOOK_SECRET=your_webhook_secret_here
+   WEBHOOK_BASE_URL=https://kyc-adapter.com
    ```
 
 ### Day 1 - Start Here
 
-**Morning (4 hours):**
-1. Create database migration for `idmeta_templates` table
-2. Create database migration for `idmeta_plans` table
-3. Create database migration for `idmeta_verification_sessions` table
-4. Test migrations on local database
+**Morning (3 hours):**
+1. Create database migration for new columns
+2. Create optional `webhook_logs` table
+3. Test migrations on local database
 
-**Afternoon (3 hours):**
-1. Update `IKycProvider` interface with optional methods
-2. Create provider-specific TypeScript types
-3. Update `ProviderType` enum
-4. Ensure TypeScript compiles without errors
+**Afternoon (4 hours):**
+1. Create HTTP client class
+2. Implement API methods
+3. Add error handling and logging
+4. Test with provider test account
 
 **End of Day:**
 - [ ] Migrations run successfully
-- [ ] Rollback works
-- [ ] TypeScript compiles
-- [ ] Create PR: "Provider Foundation - DB Schema & Types"
+- [ ] HTTP client can call provider API
+- [ ] Test verification can be created
+- [ ] Create PR: "External Provider Foundation"
 
 ---
 
@@ -214,60 +201,14 @@ src/providers/implementations/external/
 ### Q: How does the client API change?
 **A:** It doesn't! Same endpoints, same request format. Only internal routing changes.
 
-### Q: What if the provider API is down?
-**A:** Templates are cached in database. Verifications can still be created (but execution will fail gracefully).
+### Q: What if webhook fails?
+**A:** We implement retry logic and poll provider API as fallback. Webhook failures are logged.
 
-### Q: Can we support custom workflows later?
-**A:** Yes! Template-First is designed to be upgraded to Hybrid approach without breaking changes.
+### Q: How do we test webhooks locally?
+**A:** Use `ngrok` to expose local server. Set webhook URL to `https://abc123.ngrok.io/webhooks/provider`.
 
-### Q: How do we handle multiple providers per tenant?
-**A:** `tenant_provider_configs` table supports priority. Highest priority provider is used first, with fallback to next.
-
-### Q: What about testing?
-**A:** Use the provider's test account/sandbox data. All tests use test mode.
-
----
-
-## 🎓 Understanding the External Provider
-
-### What Makes IDmeta Different?
-
-**Traditional KYC (Regula):**
-```
-Upload document → OCR extracts data → Verify authenticity
-```
-
-**External Provider:**
-```
-Option 1: Same as above (document upload)
-Option 2: Provide ID number → Query gov database → Get official status
-```
-
-### Example: NBI Clearance Verification
-
-**With Regula (Document):**
-1. User uploads photo of NBI clearance
-2. OCR extracts data (name, ID number, dates)
-3. Check if document looks authentic
-4. **Problem:** Can't verify if clearance is actually valid with NBI
-
-**With External Provider (ID-Based):**
-1. User provides NBI number + name + birthdate
-2. The provider queries the registry database directly
-3. Returns official clearance status
-4. **Benefit:** 100% accurate, no document needed
-
-### Example Templates (From Provider Account)
-
-| Template ID | Name | Plans Included |
-|-------------|------|----------------|
-| 456 | Untitled 21/03/2025 | Document + Biometrics + Face Compare |
-| 426 | Two Philippine IDs | Document + Biometrics |
-| 425 | Philsys | QR Scan (PhilSys) |
-| 424 | One Foreign ID | Document + Biometrics |
-| 306 | First Philippine ID | Document only |
-
-**Default for testing:** Template 306 (simplest)
+### Q: What about webhook security?
+**A:** We verify HMAC SHA-256 signatures on all webhooks. Invalid signatures are rejected.
 
 ---
 
@@ -283,24 +224,6 @@ npm run migration:run
 
 # Rollback migrations
 npm run migration:revert
-
-# Seed database
-npm run db:seed
-```
-
-### Provider-Specific (After Implementation)
-```bash
-# Sync templates from provider
-npm run idmeta:sync-templates
-
-# List cached templates
-npm run idmeta:list-templates
-
-# Test verification
-npm run idmeta:test-verification
-
-# Health check
-npm run idmeta:health-check
 ```
 
 ### Testing
@@ -308,14 +231,21 @@ npm run idmeta:health-check
 # Unit tests
 npm run test
 
-# Watch mode
-npm run test:watch
+# Integration tests
+npm run test:e2e
 
 # Coverage report
 npm run test:cov
+```
 
-# Integration tests
-npm run test:e2e
+### Provider-Specific
+```bash
+# Test connectivity
+curl -X GET https://provider-api.com/api/v1/templates \
+  -H "X-API-Key: your_api_key_here"
+
+# Test webhook locally with ngrok
+ngrok http 3000
 ```
 
 ---
@@ -323,15 +253,15 @@ npm run test:e2e
 ## 📊 Success Metrics
 
 ### Functional
-- [ ] Template-based verification works end-to-end
-- [ ] ID-based verification works (NBI, PRC, etc.)
+- [ ] External provider verification works end-to-end
+- [ ] Webhooks received and processed correctly
+- [ ] Hosted workflow redirects working
 - [ ] Existing Regula integrations unaffected
-- [ ] Multi-step workflow abstracted from client
 
 ### Performance
-- [ ] Verification completes in < 30 seconds
-- [ ] Template sync in < 10 seconds
-- [ ] Database queries < 200ms
+- [ ] Verification creation < 2 seconds
+- [ ] Webhook processing < 500ms
+- [ ] Status polling < 1 second
 
 ### Quality
 - [ ] 85%+ test coverage
@@ -343,64 +273,59 @@ npm run test:e2e
 
 ## 🆘 When You're Stuck
 
-### Problem: TypeScript errors after interface changes
-**Solution:** 
-1. Check `IKycProvider` interface is correctly defined
-2. Ensure new methods are marked as optional (`?`)
-3. Update Regula provider to satisfy interface (can throw "not implemented" for optional methods)
-
-### Problem: Database migration fails
-**Solution:**
-1. Check PostgreSQL is running
-2. Verify database connection in `.env`
-3. Check for syntax errors in migration file
-4. Try rollback and re-run
-5. Check for conflicting migrations
-
 ### Problem: Provider API returns 401 Unauthorized
+**Solution:** 
+1. Verify `X-API-Key` header is set correctly
+2. Check API key in `.env` matches provider dashboard
+3. Ensure API key has not been revoked
+
+### Problem: Webhooks not received
 **Solution:**
-1. Verify API token in `.env` is correct
-2. Check token has not expired
-3. Ensure `Authorization: Bearer {token}` header is sent
-4. Contact provider support if issue persists
+1. Check webhook URL is publicly accessible (use ngrok for local dev)
+2. Verify webhook URL configured in provider dashboard
+3. Review `webhook_logs` table for received but failed webhooks
 
-### Problem: Template sync not working
+### Problem: Signature verification fails
 **Solution:**
-1. Check provider API credentials
-2. Verify network connectivity
-3. Check logs for detailed error
-4. Try manual API call with curl to isolate issue
-
-### Problem: Tests failing randomly
-**Solution:**
-1. Ensure test database is separate from dev database
-2. Add proper cleanup in `afterEach` hooks
-3. Check for timing issues (add `await` where needed)
-4. Run tests in isolation to identify flaky test
-
----
-
-## 📞 Support Contacts
-
-**Provider:**
-- Support: support@provider.example
-- Documentation: https://docs.provider.example (if available)
-- API Status: Check with account manager
-
-**Internal:**
-- Technical Lead: [Your Name]
-- DevOps: [Name]
-- Product Manager: [Name]
+1. Ensure webhook secret matches provider dashboard
+2. Verify HMAC computation uses raw request body
+3. Check signature format matches provider's specification
 
 ---
 
 ## 🎉 Ready to Build?
 
-**Start with Day 1 in `IDMETA_DEVELOPMENT_PLAN.md`**
+**Start with Day 1 in `DEVELOPMENT_PLAN.md`**
+
+### Quick Checklist:
+
+- [ ] Provider API key obtained
+- [ ] Webhook secret received
+- [ ] Test account access confirmed
+- [ ] PostgreSQL running locally
+- [ ] `.env` configured correctly
+- [ ] Read this guide completely
+
+### First Task:
+
+```bash
+# 1. Create database migration
+npm run migration:create AddExternalProviderSupport
+
+# 2. Add new columns to verifications and providers tables
+# See EXTERNAL_PROVIDER_INTEGRATION.md Section 5
+
+# 3. Run migration
+npm run migration:run
+
+# 4. Verify migration
+# Check database to confirm columns exist
+```
 
 Good luck! 🚀
 
 ---
 
-*Last Updated: October 16, 2025*
+*Last Updated: January 20, 2025*
+*Provider-agnostic design for flexible KYC integrations*
 

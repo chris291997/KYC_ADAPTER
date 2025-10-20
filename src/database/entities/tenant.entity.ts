@@ -13,7 +13,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsIn, IsString, IsNotEmpty, IsOptional, MinLength } from 'class-validator';
 import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcryptjs';
-import { TenantApiKey } from './tenant-api-key.entity';
+import { ApiKey } from './api-key.entity';
 import { Account } from './account.entity';
 import { InquiryTemplate } from './inquiry-template.entity';
 import { Inquiry } from './inquiry.entity';
@@ -78,8 +78,8 @@ export class Tenant {
   updatedAt: Date;
 
   // Relationships
-  @OneToMany(() => TenantApiKey, (apiKey) => apiKey.tenant)
-  apiKeys: TenantApiKey[];
+  @OneToMany(() => ApiKey, (apiKey) => apiKey.tenant)
+  apiKeys: ApiKey[];
 
   @OneToMany(() => Account, (account) => account.tenant)
   accounts: Account[];

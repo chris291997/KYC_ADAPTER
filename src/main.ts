@@ -156,15 +156,7 @@ async function bootstrap() {
         },
         'admin-auth',
       )
-      .addApiKey(
-        {
-          type: 'apiKey',
-          name: 'X-Admin-API-Key',
-          in: 'header',
-          description: 'Admin API key in format: kya_admin_...',
-        },
-        'admin-api-key',
-      )
+      // Admin API keys are no longer supported (JWT only)
 
       // Tenant Authentication Options
       .addBearerAuth(
@@ -198,7 +190,7 @@ async function bootstrap() {
       .addTag('API Keys', 'API key management operations')
       .addTag('Future KYC', 'Planned KYC verification endpoints')
       .addTag('Authentication Tenant', 'Tenant authentication endpoints')
-      .addTag('Authentication Admin', 'Admin authentication endpoints')
+      .addTag('Authentication Admin', 'Admin authentication endpoints (JWT only)')
       .build();
 
     const document = SwaggerModule.createDocument(app, config, {

@@ -2,11 +2,11 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AdminRefreshToken, TenantRefreshToken } from '../database/entities';
+import { RefreshToken } from '../database/entities';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AdminRefreshToken, TenantRefreshToken]),
+    TypeOrmModule.forFeature([RefreshToken]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

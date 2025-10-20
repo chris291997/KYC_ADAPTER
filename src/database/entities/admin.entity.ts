@@ -4,7 +4,6 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany,
   Index,
   BeforeInsert,
   BeforeUpdate,
@@ -13,7 +12,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsIn, IsString, IsNotEmpty, IsOptional, MinLength } from 'class-validator';
 import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcryptjs';
-import { AdminApiKey } from './admin-api-key.entity';
+// Admins do not own API keys; API keys are tenant-only
 
 export type AdminStatus = 'active' | 'inactive' | 'suspended';
 export type AdminRole = 'super_admin' | 'admin' | 'viewer';
@@ -86,8 +85,7 @@ export class Admin {
   updatedAt: Date;
 
   // Relationships
-  @OneToMany(() => AdminApiKey, (apiKey) => apiKey.admin)
-  apiKeys: AdminApiKey[];
+  // Note: Admins no longer have API keys; authentication is via JWT/admin login
 
   // Password hashing hooks
   @BeforeInsert()

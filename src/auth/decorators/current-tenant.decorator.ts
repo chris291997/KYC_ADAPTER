@@ -1,9 +1,10 @@
 import { createParamDecorator, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { Tenant, TenantApiKey } from '../../database/entities';
+import { Tenant } from '../../database/entities';
+import type { ApiKey } from '../../database/entities/api-key.entity';
 
 export interface CurrentTenantInfo {
   tenant: Tenant;
-  apiKey: TenantApiKey;
+  apiKey: ApiKey;
 }
 
 /**
@@ -46,9 +47,7 @@ export const GetTenant = createParamDecorator((data: unknown, ctx: ExecutionCont
 /**
  * Decorator to get just the API key entity
  */
-export const GetApiKey = createParamDecorator(
-  (data: unknown, ctx: ExecutionContext): TenantApiKey => {
-    const request = ctx.switchToHttp().getRequest();
-    return request.apiKey;
-  },
-);
+export const GetApiKey = createParamDecorator((data: unknown, ctx: ExecutionContext): ApiKey => {
+  const request = ctx.switchToHttp().getRequest();
+  return request.apiKey;
+});
