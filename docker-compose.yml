@@ -24,11 +24,12 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis (optional - for caching and session storage)
+  # Redis (required for event-driven architecture - queue, pub/sub, caching)
   redis:
     image: redis:7-alpine
     container_name: kyc-adapter-redis
     restart: unless-stopped
+    command: redis-server --appendonly yes --appendfsync everysec
     ports:
       - "6379:6379"
     volumes:

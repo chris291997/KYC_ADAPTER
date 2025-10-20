@@ -12,6 +12,7 @@ import {
   VerificationResult,
   ProcessingMethod,
 } from '../types/provider.types';
+import { ProcessingMode } from '../types/async-provider.types';
 
 /**
  * Mock implementation of Regula KYC provider for development and testing
@@ -33,6 +34,7 @@ export class MockRegulaProvider implements IKycProvider {
 
   readonly name = 'regula-mock';
   readonly type = 'regula';
+  readonly processingMode = ProcessingMode.SINGLE_STEP;
 
   async initialize(credentials: ProviderCredentials, config?: ProviderConfig): Promise<void> {
     this.logger.log('Initializing Mock Regula Provider');

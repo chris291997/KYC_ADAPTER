@@ -9,6 +9,7 @@ import * as winston from 'winston';
 // Import modules
 import { DatabaseModule } from './database/database.module';
 import { CommonModule } from './common/common.module';
+import { QueueModule } from './queue/queue.module';
 import { ProvidersModule } from './providers/providers.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -78,6 +79,7 @@ import { AdminAuthGuard } from './auth/guards/admin-auth.guard';
     // Application modules
     DatabaseModule,
     CommonModule,
+    QueueModule, // Event-driven async processing
     ProvidersModule,
     AuthModule,
     TenantsModule,
@@ -88,6 +90,7 @@ import { AdminAuthGuard } from './auth/guards/admin-auth.guard';
 
     // TODO: Add these modules when they're created
     // HealthModule,
+    // WebSocketModule, (Day 3)
   ],
   controllers: [AppController, AdminAnalyticsController, AdminTenantsAnalyticsController],
   providers: [
