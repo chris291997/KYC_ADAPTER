@@ -39,7 +39,7 @@ export class AdminAuthGuard implements CanActivate {
       return true; // Not an admin route, allow access
     }
 
-    // Perform admin authentication (try JWT first, then API key)
+    // Perform admin authentication (JWT only)
     const request = context.switchToHttp().getRequest<Request>();
 
     try {
@@ -64,20 +64,7 @@ export class AdminAuthGuard implements CanActivate {
         }
       }
 
-      // If JWT failed, try API key authentication
-      if (!adminAuth) {
-        const apiKey = this.extractApiKey(request);
-        if (apiKey) {
-          const authResult = await this.adminAuthService.validateApiKey(apiKey);
-          if (authResult) {
-            adminAuth = {
-              admin: authResult.admin,
-              apiKey: authResult.apiKey,
-              type: 'admin_api_key',
-            };
-          }
-        }
-      }
+      // Admin API keys are no longer supported
 
       if (!adminAuth) {
         throw new UnauthorizedException('Admin authentication required');
@@ -109,35 +96,6 @@ export class AdminAuthGuard implements CanActivate {
         ? error
         : new UnauthorizedException('Admin authentication failed');
     }
-  }
-
-  /**
-   * Extract admin API key from request
-   */
-  private extractApiKey(request: Request): string | null {
-    // Check Authorization header (Bearer token)
-    const authHeader = request.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      // Only accept admin API keys (they start with kya_admin_)
-      if (token.startsWith('kya_admin_')) {
-        return token;
-      }
-    }
-
-    // Check X-Admin-API-Key header
-    const adminApiKeyHeader = request.headers['x-admin-api-key'] as string;
-    if (adminApiKeyHeader && adminApiKeyHeader.startsWith('kya_admin_')) {
-      return adminApiKeyHeader;
-    }
-
-    // Check query parameter
-    const apiKeyQuery = request.query.admin_api_key as string;
-    if (apiKeyQuery && apiKeyQuery.startsWith('kya_admin_')) {
-      return apiKeyQuery;
-    }
-
-    return null;
   }
 
   /**

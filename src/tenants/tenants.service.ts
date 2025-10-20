@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Tenant, TenantApiKey, ApiKeyStatus, Account, Verification } from '../database/entities';
+import { Tenant, Account, Verification } from '../database/entities';
+import { ApiKey, ApiKeyStatus } from '../database/entities/api-key.entity';
 import { ImgbbService } from '../common/services/imgbb.service';
 import { AuthService } from '../auth/auth.service';
 import {
@@ -26,8 +27,8 @@ export class TenantsService {
   constructor(
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
-    @InjectRepository(TenantApiKey)
-    private readonly apiKeyRepository: Repository<TenantApiKey>,
+    @InjectRepository(ApiKey)
+    private readonly apiKeyRepository: Repository<ApiKey>,
     @InjectRepository(Account)
     private readonly accountRepository: Repository<Account>,
     @InjectRepository(Verification)
@@ -215,7 +216,10 @@ export class TenantsService {
     // Fallback: Soft delete by setting status to inactive and revoking keys
     tenant.status = 'inactive';
     await this.tenantRepository.save(tenant);
-    await this.apiKeyRepository.update({ tenantId }, { status: 'revoked' as ApiKeyStatus });
+    await this.apiKeyRepository.update(
+      { ownerId: tenantId as any },
+      { status: 'revoked' as ApiKeyStatus },
+    );
     this.logger.log(`Soft-deleted tenant: ${tenant.name} (${tenant.id})`);
   }
 
@@ -290,7 +294,7 @@ export class TenantsService {
   async revokeApiKey(tenantId: string, apiKeyId: string): Promise<void> {
     // Verify the API key belongs to the tenant
     const apiKey = await this.apiKeyRepository.findOne({
-      where: { id: apiKeyId, tenantId },
+      where: { id: apiKeyId, ownerId: tenantId as any },
     });
 
     if (!apiKey) {
@@ -310,7 +314,9 @@ export class TenantsService {
     apiKeyId: string,
     updates: { name?: string; expiresAt?: string | null; status?: ApiKeyStatus },
   ): Promise<ApiKeyResponseDto> {
-    const apiKey = await this.apiKeyRepository.findOne({ where: { id: apiKeyId, tenantId } });
+    const apiKey = await this.apiKeyRepository.findOne({
+      where: { id: apiKeyId, ownerId: tenantId as any },
+    });
     if (!apiKey) {
       throw new NotFoundException('API key not found or does not belong to tenant');
     }
@@ -340,7 +346,9 @@ export class TenantsService {
     apiKeyId: string,
     options: { name?: string; expiresAt?: string } = {},
   ): Promise<ApiKeyCreatedResponseDto> {
-    const existing = await this.apiKeyRepository.findOne({ where: { id: apiKeyId, tenantId } });
+    const existing = await this.apiKeyRepository.findOne({
+      where: { id: apiKeyId, ownerId: tenantId as any },
+    });
     if (!existing) {
       throw new NotFoundException('API key not found or does not belong to tenant');
     }
@@ -366,7 +374,7 @@ export class TenantsService {
     };
   }
 
-  private buildMaskedKeyPreview(apiKey: TenantApiKey): string {
+  private buildMaskedKeyPreview(apiKey: ApiKey): string {
     const suffix = apiKey.previewSuffix || '0000';
     return `kya_****${suffix}`;
   }
@@ -393,8 +401,8 @@ export class TenantsService {
 
     // Get counts from related tables
     const [apiKeyCount, activeApiKeyCount] = await Promise.all([
-      this.apiKeyRepository.count({ where: { tenantId } }),
-      this.apiKeyRepository.count({ where: { tenantId, status: 'active' } }),
+      this.apiKeyRepository.count({ where: { ownerId: tenantId as any } }),
+      this.apiKeyRepository.count({ where: { ownerId: tenantId as any, status: 'active' } }),
     ]);
 
     // Counts
@@ -621,10 +629,10 @@ export class TenantsService {
   /**
    * Map API key entity to response DTO
    */
-  private mapToApiKeyResponse(apiKey: TenantApiKey): ApiKeyResponseDto {
+  private mapToApiKeyResponse(apiKey: ApiKey): ApiKeyResponseDto {
     return {
       id: apiKey.id,
-      tenantId: apiKey.tenantId,
+      tenantId: apiKey.ownerId as any,
       name: apiKey.name,
       status: apiKey.status,
       expiresAt: apiKey.expiresAt,

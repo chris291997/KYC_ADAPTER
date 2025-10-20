@@ -1,12 +1,12 @@
 // Tenant entities
 export * from './tenant.entity';
-export * from './tenant-api-key.entity';
 
 // Admin entities
 export * from './admin.entity';
-export * from './admin-api-key.entity';
-export * from './admin-refresh-token.entity';
-export * from './tenant-refresh-token.entity';
+
+// Unified authentication entities
+export * from './api-key.entity';
+export * from './refresh-token.entity';
 
 // Account and inquiry entities
 export * from './account.entity';

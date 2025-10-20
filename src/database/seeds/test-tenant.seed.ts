@@ -1,11 +1,12 @@
 import { DataSource } from 'typeorm';
 import { createHash, randomBytes } from 'crypto';
-import { Tenant, TenantApiKey } from '../entities';
+import { Tenant } from '../entities';
+import { ApiKey } from '../entities/api-key.entity';
 
 export class TestTenantSeeder {
   public async run(dataSource: DataSource): Promise<void> {
     const tenantRepository = dataSource.getRepository(Tenant);
-    const apiKeyRepository = dataSource.getRepository(TenantApiKey);
+    const apiKeyRepository = dataSource.getRepository(ApiKey);
 
     console.log('🌱 Seeding test tenant and API key...');
 
@@ -18,7 +19,7 @@ export class TestTenantSeeder {
       console.log('✅ Test tenant already exists');
       // Check if API key exists
       const existingApiKey = await apiKeyRepository.findOne({
-        where: { tenantId: existingTenant.id, name: 'Test API Key' },
+        where: { ownerId: existingTenant.id as any, name: 'Test API Key' },
       });
 
       if (existingApiKey) {
@@ -51,7 +52,8 @@ export class TestTenantSeeder {
 
     // Create API key
     const apiKey = apiKeyRepository.create({
-      tenantId: tenant.id,
+      ownerType: 'tenant',
+      ownerId: tenant.id as any,
       name: 'Test API Key',
       keyHash,
       status: 'active',

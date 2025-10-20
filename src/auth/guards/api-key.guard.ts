@@ -90,45 +90,14 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     try {
-      // First try tenant authentication
+      // Tenant API keys only
       const authenticatedTenant = await this.authService.validateApiKey(apiKey);
-      // Add tenant context to request
       (request as any).tenant = authenticatedTenant.tenant;
       (request as any).apiKey = authenticatedTenant.apiKey;
       (request as any).auth = authenticatedTenant;
       (request as any).authType = 'tenant';
-
       return true;
-    } catch (tenantError) {
-      // If tenant auth fails, try admin authentication (admins can access tenant APIs)
-      try {
-        const adminAuth = await this.adminAuthService.validateApiKey(apiKey);
-        if (adminAuth) {
-          // Add admin context to request (formatted like tenant auth for compatibility)
-          (request as any).admin = adminAuth.admin;
-          (request as any).apiKey = adminAuth.apiKey;
-          (request as any).auth = {
-            admin: adminAuth.admin,
-            apiKey: adminAuth.apiKey,
-            type: 'admin',
-          };
-          (request as any).authType = 'admin';
-
-          // Optional: act-as-tenant support for admins via header/query
-          const overrideTenantId = this.getTenantOverride(request);
-          if (overrideTenantId) {
-            const tenant = await this.authService.getTenantById(overrideTenantId);
-            if (tenant && tenant.isActive()) {
-              (request as any).tenant = tenant;
-            }
-          }
-
-          return true;
-        }
-      } catch (adminError) {
-        // Both authentication methods failed
-      }
-
+    } catch {
       throw new UnauthorizedException('Invalid API key');
     }
   }
@@ -152,38 +121,25 @@ export class ApiKeyGuard implements CanActivate {
    * Extract API key from request
    */
   private extractApiKey(request: Request): string | null {
-    // Check Authorization header: "Bearer kya_..." (now accepts both tenant and admin keys)
+    // Check Authorization header: "Bearer kya_..." (tenant keys only)
     const authHeader = request.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
-      // Accept both tenant (kya_) and admin keys (kya_admin_)
       if (token.startsWith('kya_')) {
         return token;
       }
     }
 
-    // Check X-API-Key header (accepts both tenant and admin keys)
+    // Check X-API-Key header (tenant keys only)
     const apiKeyHeader = request.headers['x-api-key'] as string;
     if (apiKeyHeader && apiKeyHeader.startsWith('kya_')) {
       return apiKeyHeader;
-    }
-
-    // Check X-Admin-API-Key header (for admin keys)
-    const adminApiKeyHeader = request.headers['x-admin-api-key'] as string;
-    if (adminApiKeyHeader && adminApiKeyHeader.startsWith('kya_admin_')) {
-      return adminApiKeyHeader;
     }
 
     // Check query parameter (for webhook callbacks)
     const apiKeyQuery = request.query.api_key as string;
     if (apiKeyQuery && apiKeyQuery.startsWith('kya_')) {
       return apiKeyQuery;
-    }
-
-    // Check admin query parameter
-    const adminApiKeyQuery = request.query.admin_api_key as string;
-    if (adminApiKeyQuery && adminApiKeyQuery.startsWith('kya_admin_')) {
-      return adminApiKeyQuery;
     }
 
     return null;
@@ -195,7 +151,8 @@ export class ApiKeyGuard implements CanActivate {
    */
   private getTenantOverride(request: Request): string | null {
     const headerTenantId = (request.headers['x-tenant-id'] as string) || null;
-    const queryTenantId = (request.query['tenantId'] as string) || (request.query['tenant_id'] as string) || null;
+    const queryTenantId =
+      (request.query['tenantId'] as string) || (request.query['tenant_id'] as string) || null;
     return headerTenantId || queryTenantId || null;
   }
 }

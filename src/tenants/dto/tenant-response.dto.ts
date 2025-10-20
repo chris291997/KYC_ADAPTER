@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { TenantStatus, ApiKeyStatus } from '../../database/entities';
+import { TenantStatus } from '../../database/entities';
+import type { ApiKeyStatus } from '../../database/entities/api-key.entity';
 
 export class TenantResponseDto {
   @ApiProperty({ description: 'Unique tenant identifier' })

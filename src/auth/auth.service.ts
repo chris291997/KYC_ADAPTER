@@ -2,11 +2,12 @@ import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
-import { Tenant, TenantApiKey, ApiKeyStatus } from '../database/entities';
+import { Tenant } from '../database/entities';
+import { ApiKey, ApiKeyStatus } from '../database/entities/api-key.entity';
 
 export interface AuthenticatedTenant {
   tenant: Tenant;
-  apiKey: TenantApiKey;
+  apiKey: ApiKey;
 }
 
 @Injectable()
@@ -16,8 +17,8 @@ export class AuthService {
   constructor(
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
-    @InjectRepository(TenantApiKey)
-    private readonly apiKeyRepository: Repository<TenantApiKey>,
+    @InjectRepository(ApiKey)
+    private readonly apiKeyRepository: Repository<ApiKey>,
   ) {}
 
   // KMS/ENV: symmetric key for encrypting API keys (32 bytes for AES-256-GCM)
@@ -107,14 +108,15 @@ export class AuthService {
     tenantId: string,
     name: string,
     expiresAt?: Date,
-  ): Promise<{ apiKey: string; entity: TenantApiKey }> {
+  ): Promise<{ apiKey: string; entity: ApiKey }> {
     // Generate a secure random API key
     const apiKey = `kya_${randomBytes(32).toString('hex')}`;
     const keyHash = this.hashApiKey(apiKey);
 
     // Create the API key entity
     const apiKeyEntity = this.apiKeyRepository.create({
-      tenantId,
+      ownerType: 'tenant',
+      ownerId: tenantId,
       name,
       keyHash,
       expiresAt,
@@ -174,9 +176,9 @@ export class AuthService {
   /**
    * Get all API keys for a tenant
    */
-  async getTenantApiKeys(tenantId: string): Promise<TenantApiKey[]> {
+  async getTenantApiKeys(tenantId: string): Promise<ApiKey[]> {
     return this.apiKeyRepository.find({
-      where: { tenantId },
+      where: { ownerId: tenantId },
       order: { createdAt: 'DESC' },
     });
   }
