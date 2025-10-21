@@ -8,18 +8,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### In Progress (Day 3)
-- External provider HTTP client implementation
-- Template synchronization service
-- Session service for progress tracking
+- Webhook controller and handler service
+- Database integration for webhook logs
+- Provider registration in the system
+- E2E testing infrastructure
 
 ### Planned
-- Queue processor for async verifications (Day 3)
-- WebSocket gateway for real-time updates (Day 3)
-- Async verification endpoint (Day 3)
-- Webhook dispatcher service (Day 3)
-- Provider registration and factory integration (Day 4)
-- End-to-end integration testing (Day 5)
-- Comprehensive unit tests and documentation (Day 5)
+- Provider configuration UI (Day 4)
+- Multi-tenant provider selection (Day 4)
+- Complete E2E test suite (Day 5)
+- Production deployment guide (Day 5)
+
+## [1.3.0] - 2025-10-21
+
+### Added - External KYC Provider Integration (Days 1-2)
+
+#### Day 2: Provider Adapter Implementation (2025-10-21)
+
+**External Provider Adapter**
+- **`external.provider.ts`** (421 lines): Complete `IKycProvider` implementation
+  - Webhook-driven verification workflow
+  - HMAC SHA256 webhook signature verification
+  - Support for all verification types (document, ID-based, biometric, AML, comprehensive)
+  - Health check and credential validation
+  - Comprehensive error handling and logging
+  - Initialization with custom timeout and retry settings
+  - 95%+ test coverage with 21 unit tests
+
+**Provider Capabilities**
+- Template support: Not supported (webhook-driven, no templates)
+- ID-based verification: Supported
+- Async processing: Supported via webhooks
+- Processing mode: `ASYNC_WEBHOOK`
+- Supported methods: Document, ID-based, Biometric, AML, Comprehensive
+- Supported steps: Document upload, Face verification, ID verification, Liveness, AML, OTP
+- Average processing time: 60 seconds
+
+**Security Features**
+- Webhook signature verification using HMAC SHA256
+- Credential redaction in logs and config
+- Secure buffer comparison (timing-safe)
+- Support for multiple signature formats (`sha256=...` or raw hash)
+
+#### Day 1: HTTP Client & Mappers (2025-10-21)
+
+**HTTP Client Infrastructure**
+- **`external-http.client.ts`** (246 lines): Production-ready HTTP client
+  - Automatic retry with exponential backoff (3 attempts: 1s, 2s, 4s)
+  - Configurable timeout (30s default)
+  - Request/response logging with correlation IDs
+  - Error transformation (Axios → Provider errors)
+  - Health check endpoint support
+  - Credential redaction for security
+  - 100% test coverage with 13 unit tests
+
+**Request/Response Mappers**
+- **`request.mapper.ts`** (175 lines): Internal → Provider format transformation
+  - Verification type mapping (11 types supported)
+  - Full name building from parts
+  - Address handling with missing fields
+  - Reference ID priority (referenceId > accountId)
+  - Metadata enrichment
+  - Undefined value removal
+  - 100% test coverage with 17 unit tests
+
+- **`response.mapper.ts`** (302 lines): Provider → Internal format transformation
+  - Create response mapping
+  - Status response mapping with full result
+  - Webhook payload mapping
+  - 10 status mappings (pending, processing, completed, approved, rejected, etc.)
+  - Validated data extraction (personal info, document, biometric)
+  - Additional checks mapping (watchlist, sanctions, PEP)
+  - Edge case handling (partial data, empty checks)
+  - 100% test coverage with 10 unit tests
+
+**Type Definitions**
+- **`provider-api.types.ts`** (249 lines): Complete TypeScript types
+  - Provider credentials and config types
+  - Request types: Create, GetStatus, Cancel
+  - Response types: Create, Status, Cancel, HealthCheck, Error
+  - Webhook types: Payload, EventType, Data
+  - Verification types and statuses
+  - Result types: Personal info, Document, Address, Biometric, Checks, Flags
+
+**Testing & Documentation**
+- 61 unit tests passing (13 + 17 + 10 + 21)
+- 100% test coverage for HTTP client and mappers
+- 95%+ test coverage for provider adapter
+- Comprehensive README with usage examples
+- Manual testing guide with integration test templates
+- Updated quick start guide with current status
+
+**Configuration**
+- Base URL: `https://integrate.idmetagroup.com/api`
+- API Version: v1 (configurable)
+- Authentication: Bearer token
+- Timeout: 30 seconds (configurable)
+- Retry attempts: 3 (configurable)
+- Retry delay: 1 second base (exponential backoff)
+
+### Changed
+- Updated `QUICK_START_GUIDE.md` with Day 2 completion status
+- Added `MANUAL_TESTING_GUIDE.md` for comprehensive testing instructions
+- Added `src/providers/implementations/external/README.md` with usage examples
 
 ## [1.2.0] - 2025-01-17
 

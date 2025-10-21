@@ -49,12 +49,24 @@ export class SimplifyAdapterArchitecture1760959000000 implements MigrationInterf
     `);
 
     // Step 5: Add indexes for performance
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_webhook_logs_verification" ON "webhook_logs"("verification_id")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_webhook_logs_provider" ON "webhook_logs"("provider_id")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_webhook_logs_status" ON "webhook_logs"("status")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_webhook_logs_created" ON "webhook_logs"("created_at")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_verifications_external_id" ON "verifications"("external_verification_id")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_providers_webhooks" ON "providers"("supports_webhooks")`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "idx_webhook_logs_verification" ON "webhook_logs"("verification_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "idx_webhook_logs_provider" ON "webhook_logs"("provider_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "idx_webhook_logs_status" ON "webhook_logs"("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "idx_webhook_logs_created" ON "webhook_logs"("created_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "idx_verifications_external_id" ON "verifications"("external_verification_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "idx_providers_webhooks" ON "providers"("supports_webhooks")`,
+    );
 
     // Step 6: Keep inquiry tables - they're for storing validated user data (our goal!)
     // These tables are essential for our adapter pattern:
@@ -83,8 +95,12 @@ export class SimplifyAdapterArchitecture1760959000000 implements MigrationInterf
     `);
 
     // Add indexes for inquiry-verification relationship
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_inquiries_verification" ON "inquiries"("verification_id")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_inquiries_provider_verification" ON "inquiries"("provider_verification_id")`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "idx_inquiries_verification" ON "inquiries"("verification_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "idx_inquiries_provider_verification" ON "inquiries"("provider_verification_id")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
@@ -99,7 +115,9 @@ export class SimplifyAdapterArchitecture1760959000000 implements MigrationInterf
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_webhook_logs_verification"`);
 
     // Drop foreign key
-    await queryRunner.query(`ALTER TABLE "inquiries" DROP CONSTRAINT IF EXISTS "FK_inquiries_verification"`);
+    await queryRunner.query(
+      `ALTER TABLE "inquiries" DROP CONSTRAINT IF EXISTS "FK_inquiries_verification"`,
+    );
 
     // Remove columns from inquiries table
     await queryRunner.query(`

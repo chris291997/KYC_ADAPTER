@@ -39,11 +39,19 @@ export class AddExternalProviderSupport1760958000000 implements MigrationInterfa
     `);
 
     // Step 4: Create indexes for webhook_logs table
-    await queryRunner.query(`CREATE INDEX "idx_webhook_logs_provider" ON "webhook_logs" ("provider_id")`);
-    await queryRunner.query(`CREATE INDEX "idx_webhook_logs_verification" ON "webhook_logs" ("verification_id")`);
-    await queryRunner.query(`CREATE INDEX "idx_webhook_logs_event_type" ON "webhook_logs" ("event_type")`);
+    await queryRunner.query(
+      `CREATE INDEX "idx_webhook_logs_provider" ON "webhook_logs" ("provider_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "idx_webhook_logs_verification" ON "webhook_logs" ("verification_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "idx_webhook_logs_event_type" ON "webhook_logs" ("event_type")`,
+    );
     await queryRunner.query(`CREATE INDEX "idx_webhook_logs_status" ON "webhook_logs" ("status")`);
-    await queryRunner.query(`CREATE INDEX "idx_webhook_logs_created" ON "webhook_logs" ("created_at")`);
+    await queryRunner.query(
+      `CREATE INDEX "idx_webhook_logs_created" ON "webhook_logs" ("created_at")`,
+    );
 
     // Step 5: Add foreign key constraints for webhook_logs
     await queryRunner.query(`
@@ -79,8 +87,12 @@ export class AddExternalProviderSupport1760958000000 implements MigrationInterfa
     await queryRunner.query(`ALTER TABLE "webhook_logs" DROP CONSTRAINT "CHK_webhook_status"`);
 
     // Drop foreign key constraints
-    await queryRunner.query(`ALTER TABLE "webhook_logs" DROP CONSTRAINT "FK_webhook_logs_verification"`);
-    await queryRunner.query(`ALTER TABLE "webhook_logs" DROP CONSTRAINT "FK_webhook_logs_provider"`);
+    await queryRunner.query(
+      `ALTER TABLE "webhook_logs" DROP CONSTRAINT "FK_webhook_logs_verification"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "webhook_logs" DROP CONSTRAINT "FK_webhook_logs_provider"`,
+    );
 
     // Drop indexes
     await queryRunner.query(`DROP INDEX "idx_webhook_logs_created"`);

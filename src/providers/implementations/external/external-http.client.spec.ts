@@ -4,7 +4,7 @@ import axios, { AxiosError } from 'axios';
 import {
   ProviderCreateVerificationRequest,
   ProviderCreateVerificationResponse,
-  ProviderGetVerificationStatusResponse,
+  ProviderGetResultsResponse,
   ProviderCancelVerificationResponse,
   ProviderHealthCheckResponse,
 } from './types/provider-api.types';
@@ -59,7 +59,6 @@ describe('ExternalHttpClient', () => {
           'Content-Type': 'application/json',
           Accept: 'application/json',
           Authorization: `Bearer ${credentials.apiKey}`,
-          'X-API-Version': credentials.apiVersion,
         },
       });
     });
@@ -112,37 +111,41 @@ describe('ExternalHttpClient', () => {
 
     it('should create verification successfully', async () => {
       const request: ProviderCreateVerificationRequest = {
-        first_name: 'John',
-        last_name: 'Doe',
-        email: 'john.doe@example.com',
-        verification_type: 'document',
+        template_id: 'template-123',
+        verification_id: 'VER-123',
+        callback_url: 'https://example.com/callback',
+        metadata: { custom: 'value' },
       };
 
       const response: ProviderCreateVerificationResponse = {
-        verification_id: 'ver_123',
-        status: 'pending',
-        workflow_url: 'https://verify.example.com/ver_123',
+        verification_id: 'VER-123',
+        template_id: 'template-123',
+        status: 'created',
         created_at: '2025-01-01T00:00:00Z',
+        message: 'Verification session created',
       };
 
       axiosInstance.post.mockResolvedValue({ data: response });
 
       const result = await client.createVerification(request);
 
-      expect(axiosInstance.post).toHaveBeenCalledWith('/verifications', request);
+      expect(axiosInstance.post).toHaveBeenCalledWith(
+        '/v1/verification/create-verification',
+        request,
+      );
       expect(result).toEqual(response);
     });
 
     it('should retry on 5xx errors', async () => {
       const request: ProviderCreateVerificationRequest = {
-        first_name: 'John',
-        last_name: 'Doe',
-        verification_type: 'document',
+        template_id: 'template-123',
+        verification_id: 'VER-123',
       };
 
       const response: ProviderCreateVerificationResponse = {
-        verification_id: 'ver_123',
-        status: 'pending',
+        verification_id: 'VER-123',
+        template_id: 'template-123',
+        status: 'created',
         created_at: '2025-01-01T00:00:00Z',
       };
 
@@ -164,9 +167,8 @@ describe('ExternalHttpClient', () => {
 
     it('should not retry on 4xx errors', async () => {
       const request: ProviderCreateVerificationRequest = {
-        first_name: 'John',
-        last_name: 'Doe',
-        verification_type: 'document',
+        template_id: 'template-123',
+        verification_id: 'VER-123',
       };
 
       axiosInstance.post.mockRejectedValue({
@@ -188,9 +190,8 @@ describe('ExternalHttpClient', () => {
 
     it('should throw error after max retries', async () => {
       const request: ProviderCreateVerificationRequest = {
-        first_name: 'John',
-        last_name: 'Doe',
-        verification_type: 'document',
+        template_id: 'template-123',
+        verification_id: 'VER-123',
       };
 
       axiosInstance.post.mockRejectedValue({
@@ -211,7 +212,7 @@ describe('ExternalHttpClient', () => {
     });
   });
 
-  describe('getVerificationStatus', () => {
+  describe('getResults', () => {
     beforeEach(() => {
       client.configure({
         apiKey: 'test-api-key',
@@ -220,26 +221,35 @@ describe('ExternalHttpClient', () => {
       });
     });
 
-    it('should get verification status successfully', async () => {
-      const response: ProviderGetVerificationStatusResponse = {
-        verification_id: 'ver_123',
-        status: 'completed',
+    it('should get verification results successfully', async () => {
+      const response: ProviderGetResultsResponse = {
+        verification_id: 'VER-123',
+        template_id: 'template-123',
+        status: 'finalized',
         result: {
           decision: 'approved',
           confidence_score: 0.95,
+          risk_level: 'low',
         },
+        steps_completed: [
+          {
+            step_type: 'document',
+            status: 'completed',
+            completed_at: '2025-01-01T00:03:00Z',
+          },
+        ],
         created_at: '2025-01-01T00:00:00Z',
         updated_at: '2025-01-01T00:05:00Z',
-        completed_at: '2025-01-01T00:05:00Z',
+        finalized_at: '2025-01-01T00:05:00Z',
       };
 
       axiosInstance.get.mockResolvedValue({ data: response });
 
-      const result = await client.getVerificationStatus({
-        verification_id: 'ver_123',
+      const result = await client.getResults({
+        verification_id: 'VER-123',
       });
 
-      expect(axiosInstance.get).toHaveBeenCalledWith('/verifications/ver_123');
+      expect(axiosInstance.get).toHaveBeenCalledWith('/v2/verification/get-verification/VER-123');
       expect(result).toEqual(response);
     });
   });
@@ -267,7 +277,8 @@ describe('ExternalHttpClient', () => {
         reason: 'User requested cancellation',
       });
 
-      expect(axiosInstance.post).toHaveBeenCalledWith('/verifications/ver_123/cancel', {
+      expect(axiosInstance.post).toHaveBeenCalledWith('/v1/verification/cancel-verification', {
+        verification_id: 'ver_123',
         reason: 'User requested cancellation',
       });
       expect(result).toEqual(response);
@@ -325,8 +336,8 @@ describe('ExternalHttpClient', () => {
 
       await expect(
         client.createVerification({
-          first_name: 'John',
-          verification_type: 'document',
+          template_id: 'template-123',
+          verification_id: 'VER-123',
         }),
       ).rejects.toThrow('Provider API Network Error');
     });
@@ -338,8 +349,8 @@ describe('ExternalHttpClient', () => {
           data: {
             error: {
               code: 'INVALID_REQUEST',
-              message: 'Invalid first name',
-              details: { field: 'first_name' },
+              message: 'Invalid template_id',
+              details: { field: 'template_id' },
             },
           },
         },
@@ -347,14 +358,14 @@ describe('ExternalHttpClient', () => {
 
       try {
         await client.createVerification({
-          first_name: '',
-          verification_type: 'document',
+          template_id: '',
+          verification_id: 'VER-123',
         });
       } catch (error: any) {
-        expect(error.message).toContain('Invalid first name');
+        expect(error.message).toContain('Invalid template_id');
         expect(error.code).toBe('INVALID_REQUEST');
         expect(error.statusCode).toBe(400);
-        expect(error.details).toEqual({ field: 'first_name' });
+        expect(error.details).toEqual({ field: 'template_id' });
       }
     });
   });

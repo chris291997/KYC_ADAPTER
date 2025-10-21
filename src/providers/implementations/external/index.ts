@@ -1,3 +1,6 @@
+// Provider
+export * from './external.provider';
+
 // HTTP Client
 export * from './external-http.client';
 

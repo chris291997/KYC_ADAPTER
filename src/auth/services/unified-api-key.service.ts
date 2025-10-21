@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiKey, OwnerType } from '../../database/entities/api-key.entity';
@@ -50,9 +50,9 @@ export class UnifiedApiKeyService {
    * Find API key by hash (for authentication)
    */
   async findByHash(keyHash: string): Promise<ApiKey | null> {
-    return this.apiKeyRepository.findOne({ 
+    return this.apiKeyRepository.findOne({
       where: { keyHash },
-      relations: ['admin', 'tenant']
+      relations: ['admin', 'tenant'],
     });
   }
 
@@ -62,19 +62,19 @@ export class UnifiedApiKeyService {
   async findByOwner(ownerType: OwnerType, ownerId: string): Promise<ApiKeyResponseDto[]> {
     const apiKeys = await this.apiKeyRepository.find({
       where: { ownerType, ownerId },
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
 
-    return apiKeys.map(key => this.toResponseDto(key));
+    return apiKeys.map((key) => this.toResponseDto(key));
   }
 
   /**
    * Find API key by ID
    */
   async findById(id: string): Promise<ApiKeyResponseDto> {
-    const apiKey = await this.apiKeyRepository.findOne({ 
+    const apiKey = await this.apiKeyRepository.findOne({
       where: { id },
-      relations: ['admin', 'tenant']
+      relations: ['admin', 'tenant'],
     });
 
     if (!apiKey) {
@@ -154,10 +154,14 @@ export class UnifiedApiKeyService {
     const randomBytes = crypto.randomBytes(32);
     return randomBytes.toString('base64').replace(/[+/=]/g, (char) => {
       switch (char) {
-        case '+': return '-';
-        case '/': return '_';
-        case '=': return '';
-        default: return char;
+        case '+':
+          return '-';
+        case '/':
+          return '_';
+        case '=':
+          return '';
+        default:
+          return char;
       }
     });
   }

@@ -1,11 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-  Tenant,
-  Admin,
-  ApiKey,
-  RefreshToken,
-} from '../database/entities';
+import { Tenant, Admin, ApiKey, RefreshToken } from '../database/entities';
 import { AuthService } from './auth.service';
 import { AdminAuthService } from './admin-auth.service';
 import { ApiKeyStrategy } from './strategies/api-key.strategy';
@@ -18,15 +13,7 @@ import { AuthController } from './auth.controller';
 import { TenantAuthController } from './tenant-auth.controller';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      Tenant,
-      Admin,
-      ApiKey,
-      RefreshToken,
-    ]),
-    JwtAuthModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Tenant, Admin, ApiKey, RefreshToken]), JwtAuthModule],
   controllers: [AuthController, TenantAuthController],
   providers: [
     AuthService,

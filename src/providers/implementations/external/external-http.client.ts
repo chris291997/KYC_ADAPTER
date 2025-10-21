@@ -5,8 +5,26 @@ import {
   ProviderConfig,
   ProviderCreateVerificationRequest,
   ProviderCreateVerificationResponse,
-  ProviderGetVerificationStatusRequest,
-  ProviderGetVerificationStatusResponse,
+  ProviderDocumentVerificationRequest,
+  ProviderDocumentVerificationResponse,
+  ProviderIdVerificationRequest,
+  ProviderIdVerificationResponse,
+  ProviderFaceVerificationRequest,
+  ProviderFaceVerificationResponse,
+  ProviderFaceRegistrationRequest,
+  ProviderFaceRegistrationResponse,
+  ProviderFaceComparisonRequest,
+  ProviderFaceComparisonResponse,
+  ProviderSendOtpRequest,
+  ProviderSendOtpResponse,
+  ProviderVerifyOtpRequest,
+  ProviderVerifyOtpResponse,
+  ProviderAmlCheckRequest,
+  ProviderAmlCheckResponse,
+  ProviderFinalizeVerificationRequest,
+  ProviderFinalizeVerificationResponse,
+  ProviderGetResultsRequest,
+  ProviderGetResultsResponse,
   ProviderCancelVerificationRequest,
   ProviderCancelVerificationResponse,
   ProviderHealthCheckResponse,
@@ -14,8 +32,14 @@ import {
 } from './types/provider-api.types';
 
 /**
- * HTTP Client for external KYC provider API
+ * HTTP Client for IDmeta KYC provider API
  * Handles all API communication with retry logic, error handling, and logging
+ *
+ * API Structure:
+ * - Base URL: https://<subdomain>.idmetagroup.com/api
+ * - v1 endpoints: /api/v1/verification/*
+ * - v2 endpoints: /api/v2/verification/*
+ * - Authentication: Bearer token
  */
 @Injectable()
 export class ExternalHttpClient {
@@ -42,7 +66,6 @@ export class ExternalHttpClient {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         Authorization: `Bearer ${credentials.apiKey}`,
-        'X-API-Version': credentials.apiVersion || 'v1',
       },
     });
 
@@ -83,52 +106,216 @@ export class ExternalHttpClient {
     this.logger.log('ExternalHttpClient configured successfully');
   }
 
+  // ============================================
+  // 1. CREATE VERIFICATION (v1)
+  // ============================================
+
   /**
-   * Create a new verification
+   * Create a new verification session
+   * POST /api/v1/verification/create-verification
    */
   async createVerification(
     request: ProviderCreateVerificationRequest,
   ): Promise<ProviderCreateVerificationResponse> {
     return this.executeWithRetry<ProviderCreateVerificationResponse>(async () => {
       const response = await this.axiosInstance.post<ProviderCreateVerificationResponse>(
-        '/verifications',
+        '/v1/verification/create-verification',
         request,
       );
       return response.data;
     }, 'createVerification');
   }
 
+  // ============================================
+  // 2. VERIFICATION EXECUTION ENDPOINTS (v1)
+  // ============================================
+
   /**
-   * Get verification status
+   * Execute document verification
+   * POST /api/v1/verification/document-verification
    */
-  async getVerificationStatus(
-    request: ProviderGetVerificationStatusRequest,
-  ): Promise<ProviderGetVerificationStatusResponse> {
-    return this.executeWithRetry<ProviderGetVerificationStatusResponse>(async () => {
-      const response = await this.axiosInstance.get<ProviderGetVerificationStatusResponse>(
-        `/verifications/${request.verification_id}`,
+  async documentVerification(
+    request: ProviderDocumentVerificationRequest,
+  ): Promise<ProviderDocumentVerificationResponse> {
+    return this.executeWithRetry<ProviderDocumentVerificationResponse>(async () => {
+      const response = await this.axiosInstance.post<ProviderDocumentVerificationResponse>(
+        '/v1/verification/document-verification',
+        request,
       );
       return response.data;
-    }, 'getVerificationStatus');
+    }, 'documentVerification');
   }
 
   /**
+   * Execute ID-based verification (government database check)
+   * POST /api/v1/verification/id-verification
+   */
+  async idVerification(
+    request: ProviderIdVerificationRequest,
+  ): Promise<ProviderIdVerificationResponse> {
+    return this.executeWithRetry<ProviderIdVerificationResponse>(async () => {
+      const response = await this.axiosInstance.post<ProviderIdVerificationResponse>(
+        '/v1/verification/id-verification',
+        request,
+      );
+      return response.data;
+    }, 'idVerification');
+  }
+
+  /**
+   * Execute face verification (compare with reference)
+   * POST /api/v1/verification/face-verification
+   */
+  async faceVerification(
+    request: ProviderFaceVerificationRequest,
+  ): Promise<ProviderFaceVerificationResponse> {
+    return this.executeWithRetry<ProviderFaceVerificationResponse>(async () => {
+      const response = await this.axiosInstance.post<ProviderFaceVerificationResponse>(
+        '/v1/verification/face-verification',
+        request,
+      );
+      return response.data;
+    }, 'faceVerification');
+  }
+
+  /**
+   * Register a face for future verification
+   * POST /api/v1/verification/face-registration
+   */
+  async faceRegistration(
+    request: ProviderFaceRegistrationRequest,
+  ): Promise<ProviderFaceRegistrationResponse> {
+    return this.executeWithRetry<ProviderFaceRegistrationResponse>(async () => {
+      const response = await this.axiosInstance.post<ProviderFaceRegistrationResponse>(
+        '/v1/verification/face-registration',
+        request,
+      );
+      return response.data;
+    }, 'faceRegistration');
+  }
+
+  /**
+   * Compare two face images
+   * POST /api/v1/verification/face-comparison
+   */
+  async faceComparison(
+    request: ProviderFaceComparisonRequest,
+  ): Promise<ProviderFaceComparisonResponse> {
+    return this.executeWithRetry<ProviderFaceComparisonResponse>(async () => {
+      const response = await this.axiosInstance.post<ProviderFaceComparisonResponse>(
+        '/v1/verification/face-comparison',
+        request,
+      );
+      return response.data;
+    }, 'faceComparison');
+  }
+
+  /**
+   * Send OTP (SMS or Email)
+   * POST /api/v1/verification/send-otp
+   */
+  async sendOtp(request: ProviderSendOtpRequest): Promise<ProviderSendOtpResponse> {
+    return this.executeWithRetry<ProviderSendOtpResponse>(async () => {
+      const response = await this.axiosInstance.post<ProviderSendOtpResponse>(
+        '/v1/verification/send-otp',
+        request,
+      );
+      return response.data;
+    }, 'sendOtp');
+  }
+
+  /**
+   * Verify OTP code
+   * POST /api/v1/verification/verify-otp
+   */
+  async verifyOtp(request: ProviderVerifyOtpRequest): Promise<ProviderVerifyOtpResponse> {
+    return this.executeWithRetry<ProviderVerifyOtpResponse>(async () => {
+      const response = await this.axiosInstance.post<ProviderVerifyOtpResponse>(
+        '/v1/verification/verify-otp',
+        request,
+      );
+      return response.data;
+    }, 'verifyOtp');
+  }
+
+  /**
+   * Execute AML check (sanctions, PEP, watchlist)
+   * POST /api/v1/verification/aml-check
+   */
+  async amlCheck(request: ProviderAmlCheckRequest): Promise<ProviderAmlCheckResponse> {
+    return this.executeWithRetry<ProviderAmlCheckResponse>(async () => {
+      const response = await this.axiosInstance.post<ProviderAmlCheckResponse>(
+        '/v1/verification/aml-check',
+        request,
+      );
+      return response.data;
+    }, 'amlCheck');
+  }
+
+  // ============================================
+  // 3. FINALIZE VERIFICATION (v1)
+  // ============================================
+
+  /**
+   * Finalize verification session
+   * POST /api/v1/verification/finalize-verification
+   */
+  async finalizeVerification(
+    request: ProviderFinalizeVerificationRequest,
+  ): Promise<ProviderFinalizeVerificationResponse> {
+    return this.executeWithRetry<ProviderFinalizeVerificationResponse>(async () => {
+      const response = await this.axiosInstance.post<ProviderFinalizeVerificationResponse>(
+        '/v1/verification/finalize-verification',
+        request,
+      );
+      return response.data;
+    }, 'finalizeVerification');
+  }
+
+  // ============================================
+  // 4. GET RESULTS (v2)
+  // ============================================
+
+  /**
+   * Get verification results
+   * GET /api/v2/verification/get-verification/{verification_id}
+   */
+  async getResults(request: ProviderGetResultsRequest): Promise<ProviderGetResultsResponse> {
+    return this.executeWithRetry<ProviderGetResultsResponse>(async () => {
+      const response = await this.axiosInstance.get<ProviderGetResultsResponse>(
+        `/v2/verification/get-verification/${request.verification_id}`,
+      );
+      return response.data;
+    }, 'getResults');
+  }
+
+  // ============================================
+  // 5. CANCEL VERIFICATION
+  // ============================================
+
+  /**
    * Cancel verification
+   * POST /api/v1/verification/cancel-verification
    */
   async cancelVerification(
     request: ProviderCancelVerificationRequest,
   ): Promise<ProviderCancelVerificationResponse> {
     return this.executeWithRetry<ProviderCancelVerificationResponse>(async () => {
       const response = await this.axiosInstance.post<ProviderCancelVerificationResponse>(
-        `/verifications/${request.verification_id}/cancel`,
-        { reason: request.reason },
+        '/v1/verification/cancel-verification',
+        { verification_id: request.verification_id, reason: request.reason },
       );
       return response.data;
     }, 'cancelVerification');
   }
 
+  // ============================================
+  // 6. HEALTH CHECK
+  // ============================================
+
   /**
    * Health check
+   * GET /api/health or /api/v1/health
    */
   async healthCheck(): Promise<ProviderHealthCheckResponse> {
     try {
@@ -143,6 +330,10 @@ export class ExternalHttpClient {
       };
     }
   }
+
+  // ============================================
+  // UTILITY METHODS
+  // ============================================
 
   /**
    * Execute request with retry logic

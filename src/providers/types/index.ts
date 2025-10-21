@@ -7,4 +7,3 @@ export * from './provider.types';
 
 // Async and event-driven types
 export * from './async-provider.types';
-

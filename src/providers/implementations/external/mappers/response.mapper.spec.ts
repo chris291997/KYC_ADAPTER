@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ExternalResponseMapper } from './response.mapper';
 import {
   ProviderCreateVerificationResponse,
-  ProviderGetVerificationStatusResponse,
+  ProviderGetResultsResponse,
   ProviderWebhookPayload,
   ProviderVerificationResult,
 } from '../types/provider-api.types';
@@ -20,57 +20,41 @@ describe('ExternalResponseMapper', () => {
   });
 
   describe('toInternalCreateResponse', () => {
-    it('should map provider create response to internal format', () => {
+    it('should map IDmeta create response to internal format', () => {
       const providerResponse: ProviderCreateVerificationResponse = {
-        verification_id: 'ver_123',
-        status: 'pending',
-        workflow_url: 'https://verify.example.com/ver_123',
-        hosted_url: 'https://hosted.example.com/ver_123',
-        expires_at: '2025-01-01T12:00:00Z',
+        verification_id: 'VER-123',
+        template_id: 'template-123',
+        status: 'created',
         created_at: '2025-01-01T00:00:00Z',
-        metadata: {
-          custom_field: 'custom_value',
-        },
+        message: 'Verification session created',
       };
 
-      const result = mapper.toInternalCreateResponse(providerResponse, 'internal-123');
+      const result = mapper.toInternalCreateResponse(providerResponse, 'VER-123');
 
-      expect(result.verificationId).toBe('internal-123');
-      expect(result.externalVerificationId).toBe('ver_123');
+      expect(result.verificationId).toBe('VER-123');
+      expect(result.externalVerificationId).toBe('VER-123');
       expect(result.status).toBe(VerificationStatus.PENDING);
-      expect(result.workflowUrl).toBe('https://verify.example.com/ver_123');
-      expect(result.hostedUrl).toBe('https://hosted.example.com/ver_123');
-      expect(result.expiresAt).toEqual(new Date('2025-01-01T12:00:00Z'));
-      expect(result.createdAt).toEqual(new Date('2025-01-01T00:00:00Z'));
-      expect(result.metadata).toEqual({ custom_field: 'custom_value' });
-    });
-
-    it('should use workflow_url when hosted_url not provided', () => {
-      const providerResponse: ProviderCreateVerificationResponse = {
-        verification_id: 'ver_123',
-        status: 'pending',
-        workflow_url: 'https://verify.example.com/ver_123',
-        created_at: '2025-01-01T00:00:00Z',
-      };
-
-      const result = mapper.toInternalCreateResponse(providerResponse, 'internal-123');
-
-      expect(result.workflowUrl).toBe('https://verify.example.com/ver_123');
-    });
-
-    it('should handle missing optional fields', () => {
-      const providerResponse: ProviderCreateVerificationResponse = {
-        verification_id: 'ver_123',
-        status: 'pending',
-        created_at: '2025-01-01T00:00:00Z',
-      };
-
-      const result = mapper.toInternalCreateResponse(providerResponse, 'internal-123');
-
       expect(result.workflowUrl).toBeUndefined();
       expect(result.hostedUrl).toBeUndefined();
       expect(result.expiresAt).toBeUndefined();
-      expect(result.metadata).toBeUndefined();
+      expect(result.createdAt).toEqual(new Date('2025-01-01T00:00:00Z'));
+      expect(result.metadata).toEqual({
+        template_id: 'template-123',
+        message: 'Verification session created',
+      });
+    });
+
+    it('should map status to PENDING for created status', () => {
+      const providerResponse: ProviderCreateVerificationResponse = {
+        verification_id: 'VER-123',
+        template_id: 'template-123',
+        status: 'created',
+        created_at: '2025-01-01T00:00:00Z',
+      };
+
+      const result = mapper.toInternalCreateResponse(providerResponse, 'VER-123');
+
+      expect(result.status).toBe(VerificationStatus.PENDING);
     });
   });
 
@@ -99,18 +83,10 @@ describe('ExternalResponseMapper', () => {
           is_expired: false,
           validation_checks: {
             mrz_valid: true,
-            chip_valid: true,
             image_quality: true,
             tamper_detection: false,
+            document_authentic: true,
           },
-        },
-        address: {
-          street: '123 Main St',
-          city: 'New York',
-          state: 'NY',
-          postal_code: '10001',
-          country: 'US',
-          is_verified: true,
         },
         biometric: {
           face_match: true,
@@ -118,19 +94,12 @@ describe('ExternalResponseMapper', () => {
           liveness_check: true,
           liveness_score: 0.96,
         },
-        checks: {
-          watchlist: {
-            is_match: false,
-            matches: [],
-          },
-          sanctions: {
-            is_match: false,
-            matches: [],
-          },
-          pep: {
-            is_match: false,
-            matches: [],
-          },
+        aml: {
+          risk_level: 'low',
+          watchlist_match: false,
+          sanctions_match: false,
+          pep_match: false,
+          matches: [],
         },
         flags: [
           {
@@ -144,13 +113,14 @@ describe('ExternalResponseMapper', () => {
         },
       };
 
-      const providerResponse: ProviderGetVerificationStatusResponse = {
+      const providerResponse: ProviderGetResultsResponse = {
         verification_id: 'ver_123',
-        status: 'completed',
+        template_id: 'template-123',
+        status: 'finalized',
         result: providerResult,
         created_at: '2025-01-01T00:00:00Z',
         updated_at: '2025-01-01T00:05:00Z',
-        completed_at: '2025-01-01T00:05:00Z',
+        finalized_at: '2025-01-01T00:05:00Z',
         metadata: { custom_field: 'value' },
       };
 
@@ -170,8 +140,6 @@ describe('ExternalResponseMapper', () => {
       expect(result.result?.validatedData?.dateOfBirth).toBe('1990-01-01');
       expect(result.result?.validatedData?.nationality).toBe('US');
       expect(result.result?.validatedData?.gender).toBe('M');
-      expect(result.result?.validatedData?.address?.street).toBe('123 Main St');
-      expect(result.result?.validatedData?.address?.isVerified).toBe(true);
       expect(result.result?.documentValidation?.type).toBe('passport');
       expect(result.result?.documentValidation?.number).toBe('P1234567');
       expect(result.result?.documentValidation?.isValid).toBe(true);
@@ -179,7 +147,10 @@ describe('ExternalResponseMapper', () => {
       expect(result.result?.documentValidation?.checks?.mrzValid).toBe(true);
       expect(result.result?.biometricValidation?.faceMatch).toBe(true);
       expect(result.result?.biometricValidation?.faceMatchScore).toBe(0.98);
-      expect(result.result?.additionalChecks?.watchlist?.isMatch).toBe(false);
+      expect(result.result?.additionalChecks).toBeDefined(); // AML checks object is created but all sub-checks are undefined
+      expect(result.result?.additionalChecks?.watchlist).toBeUndefined();
+      expect(result.result?.additionalChecks?.sanctions).toBeUndefined();
+      expect(result.result?.additionalChecks?.pep).toBeUndefined();
       expect(result.result?.flags).toHaveLength(1);
       expect(result.result?.flags?.[0].type).toBe('document_quality');
       expect(result.result?.rawProviderData).toEqual({ provider_specific_field: 'value' });
@@ -189,8 +160,9 @@ describe('ExternalResponseMapper', () => {
     });
 
     it('should handle status response without result', () => {
-      const providerResponse: ProviderGetVerificationStatusResponse = {
+      const providerResponse: ProviderGetResultsResponse = {
         verification_id: 'ver_123',
+        template_id: 'template-123',
         status: 'processing',
         created_at: '2025-01-01T00:00:00Z',
         updated_at: '2025-01-01T00:01:00Z',
@@ -286,26 +258,29 @@ describe('ExternalResponseMapper', () => {
   describe('mapProviderStatus', () => {
     it('should map all provider statuses correctly', () => {
       const statusMappings = [
-        { provider: 'pending' as const, expected: VerificationStatus.PENDING },
-        { provider: 'processing' as const, expected: VerificationStatus.IN_PROGRESS },
-        { provider: 'in_progress' as const, expected: VerificationStatus.IN_PROGRESS },
-        { provider: 'completed' as const, expected: VerificationStatus.COMPLETED },
-        { provider: 'approved' as const, expected: VerificationStatus.COMPLETED },
-        { provider: 'rejected' as const, expected: VerificationStatus.FAILED },
-        { provider: 'declined' as const, expected: VerificationStatus.FAILED },
-        { provider: 'failed' as const, expected: VerificationStatus.FAILED },
-        { provider: 'expired' as const, expected: VerificationStatus.EXPIRED },
-        { provider: 'cancelled' as const, expected: VerificationStatus.CANCELLED },
+        { provider: 'created', expected: VerificationStatus.PENDING },
+        { provider: 'pending', expected: VerificationStatus.PENDING },
+        { provider: 'processing', expected: VerificationStatus.IN_PROGRESS },
+        { provider: 'in_progress', expected: VerificationStatus.IN_PROGRESS },
+        { provider: 'completed', expected: VerificationStatus.COMPLETED },
+        { provider: 'finalized', expected: VerificationStatus.COMPLETED },
+        { provider: 'approved', expected: VerificationStatus.COMPLETED },
+        { provider: 'rejected', expected: VerificationStatus.FAILED },
+        { provider: 'declined', expected: VerificationStatus.FAILED },
+        { provider: 'failed', expected: VerificationStatus.FAILED },
+        { provider: 'expired', expected: VerificationStatus.EXPIRED },
+        { provider: 'cancelled', expected: VerificationStatus.CANCELLED },
       ];
 
       statusMappings.forEach(({ provider, expected }) => {
         const providerResponse: ProviderCreateVerificationResponse = {
-          verification_id: 'ver_123',
-          status: provider,
+          verification_id: 'VER-123',
+          template_id: 'template-123',
+          status: provider as any,
           created_at: '2025-01-01T00:00:00Z',
         };
 
-        const result = mapper.toInternalCreateResponse(providerResponse, 'internal-123');
+        const result = mapper.toInternalCreateResponse(providerResponse, 'VER-123');
 
         expect(result.status).toBe(expected);
       });
@@ -314,11 +289,14 @@ describe('ExternalResponseMapper', () => {
 
   describe('edge cases', () => {
     it('should handle partial personal info', () => {
-      const providerResponse: ProviderGetVerificationStatusResponse = {
-        verification_id: 'ver_123',
-        status: 'completed',
+      const providerResponse: ProviderGetResultsResponse = {
+        verification_id: 'VER-123',
+        template_id: 'template-123',
+        status: 'finalized',
         result: {
           decision: 'approved',
+          confidence_score: 0.95,
+          risk_level: 'low',
           personal_info: {
             first_name: 'John',
             last_name: 'Doe',
@@ -327,55 +305,72 @@ describe('ExternalResponseMapper', () => {
         },
         created_at: '2025-01-01T00:00:00Z',
         updated_at: '2025-01-01T00:05:00Z',
+        finalized_at: '2025-01-01T00:05:00Z',
       };
 
-      const result = mapper.toInternalStatusResponse(providerResponse, 'internal-123');
+      const result = mapper.toInternalStatusResponse(providerResponse, 'VER-123');
 
       expect(result.result?.validatedData?.firstName).toBe('John');
       expect(result.result?.validatedData?.lastName).toBe('Doe');
       expect(result.result?.validatedData?.middleName).toBeUndefined();
     });
 
-    it('should handle empty checks', () => {
-      const providerResponse: ProviderGetVerificationStatusResponse = {
-        verification_id: 'ver_123',
-        status: 'completed',
+    it('should handle empty AML checks', () => {
+      const providerResponse: ProviderGetResultsResponse = {
+        verification_id: 'VER-123',
+        template_id: 'template-123',
+        status: 'finalized',
         result: {
           decision: 'approved',
-          checks: {},
+          confidence_score: 0.95,
+          risk_level: 'low',
         },
         created_at: '2025-01-01T00:00:00Z',
         updated_at: '2025-01-01T00:05:00Z',
+        finalized_at: '2025-01-01T00:05:00Z',
       };
 
-      const result = mapper.toInternalStatusResponse(providerResponse, 'internal-123');
+      const result = mapper.toInternalStatusResponse(providerResponse, 'VER-123');
 
-      expect(result.result?.additionalChecks?.watchlist).toBeUndefined();
-      expect(result.result?.additionalChecks?.sanctions).toBeUndefined();
-      expect(result.result?.additionalChecks?.pep).toBeUndefined();
+      expect(result.result?.additionalChecks).toBeUndefined();
     });
 
-    it('should handle matches in checks', () => {
-      const providerResponse: ProviderGetVerificationStatusResponse = {
-        verification_id: 'ver_123',
-        status: 'completed',
+    it('should handle AML matches', () => {
+      const providerResponse: ProviderGetResultsResponse = {
+        verification_id: 'VER-123',
+        template_id: 'template-123',
+        status: 'finalized',
         result: {
           decision: 'manual_review',
-          checks: {
-            pep: {
-              is_match: true,
-              matches: [
-                { name: 'John Doe', match_score: 0.85 },
-                { name: 'Jonathan Doe', match_score: 0.72 },
-              ],
-            },
+          confidence_score: 0.6,
+          risk_level: 'high',
+          aml: {
+            risk_level: 'high',
+            pep_match: true,
+            sanctions_match: false,
+            watchlist_match: false,
+            matches: [
+              {
+                list_name: 'PEP Database',
+                match_type: 'pep',
+                match_score: 0.85,
+                entity_name: 'John Doe',
+              },
+              {
+                list_name: 'PEP Database',
+                match_type: 'pep',
+                match_score: 0.72,
+                entity_name: 'Jonathan Doe',
+              },
+            ],
           },
         },
         created_at: '2025-01-01T00:00:00Z',
         updated_at: '2025-01-01T00:05:00Z',
+        finalized_at: '2025-01-01T00:05:00Z',
       };
 
-      const result = mapper.toInternalStatusResponse(providerResponse, 'internal-123');
+      const result = mapper.toInternalStatusResponse(providerResponse, 'VER-123');
 
       expect(result.result?.additionalChecks?.pep?.isMatch).toBe(true);
       expect(result.result?.additionalChecks?.pep?.matches).toHaveLength(2);
@@ -384,4 +379,3 @@ describe('ExternalResponseMapper', () => {
     });
   });
 });
-

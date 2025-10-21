@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   ProviderCreateVerificationResponse,
-  ProviderGetVerificationStatusResponse,
+  ProviderGetResultsResponse,
   ProviderVerificationStatus,
   ProviderVerificationResult,
   ProviderWebhookPayload,
@@ -116,35 +116,34 @@ export class ExternalResponseMapper {
     return {
       verificationId: internalVerificationId,
       externalVerificationId: providerResponse.verification_id,
-      status: this.mapProviderStatus(providerResponse.status),
-      workflowUrl: providerResponse.workflow_url || providerResponse.hosted_url,
-      hostedUrl: providerResponse.hosted_url,
-      expiresAt: providerResponse.expires_at
-        ? new Date(providerResponse.expires_at)
-        : undefined,
+      status: this.mapProviderStatus(providerResponse.status as ProviderVerificationStatus),
+      workflowUrl: undefined,
+      hostedUrl: undefined,
+      expiresAt: undefined,
       createdAt: new Date(providerResponse.created_at),
-      metadata: providerResponse.metadata,
+      metadata: {
+        template_id: providerResponse.template_id,
+        message: providerResponse.message,
+      },
     };
   }
 
   /**
-   * Convert provider status response to internal format
+   * Convert provider results response to internal format
    */
   toInternalStatusResponse(
-    providerResponse: ProviderGetVerificationStatusResponse,
+    providerResponse: ProviderGetResultsResponse,
     internalVerificationId: string,
   ): InternalVerificationResponse {
     return {
       verificationId: internalVerificationId,
       externalVerificationId: providerResponse.verification_id,
       status: this.mapProviderStatus(providerResponse.status),
-      result: providerResponse.result
-        ? this.mapProviderResult(providerResponse.result)
-        : undefined,
+      result: providerResponse.result ? this.mapProviderResult(providerResponse.result) : undefined,
       createdAt: new Date(providerResponse.created_at),
       updatedAt: new Date(providerResponse.updated_at),
-      completedAt: providerResponse.completed_at
-        ? new Date(providerResponse.completed_at)
+      completedAt: providerResponse.finalized_at
+        ? new Date(providerResponse.finalized_at)
         : undefined,
       metadata: providerResponse.metadata,
     };
@@ -179,14 +178,14 @@ export class ExternalResponseMapper {
   /**
    * Map provider status to internal status
    */
-  private mapProviderStatus(
-    providerStatus: ProviderVerificationStatus,
-  ): VerificationStatus {
+  private mapProviderStatus(providerStatus: ProviderVerificationStatus): VerificationStatus {
     const statusMap: Record<ProviderVerificationStatus, VerificationStatus> = {
+      created: VerificationStatus.PENDING,
       pending: VerificationStatus.PENDING,
       processing: VerificationStatus.IN_PROGRESS,
       in_progress: VerificationStatus.IN_PROGRESS,
       completed: VerificationStatus.COMPLETED,
+      finalized: VerificationStatus.COMPLETED,
       approved: VerificationStatus.COMPLETED,
       rejected: VerificationStatus.FAILED,
       declined: VerificationStatus.FAILED,
@@ -217,14 +216,14 @@ export class ExternalResponseMapper {
             dateOfBirth: providerResult.personal_info.date_of_birth,
             nationality: providerResult.personal_info.nationality,
             gender: providerResult.personal_info.gender,
-            address: providerResult.address
+            address: providerResult.personal_info.address
               ? {
-                  street: providerResult.address.street,
-                  city: providerResult.address.city,
-                  state: providerResult.address.state,
-                  postalCode: providerResult.address.postal_code,
-                  country: providerResult.address.country,
-                  isVerified: providerResult.address.is_verified,
+                  street: undefined,
+                  city: undefined,
+                  state: undefined,
+                  postalCode: undefined,
+                  country: undefined,
+                  isVerified: false,
                 }
               : undefined,
           }
@@ -241,11 +240,9 @@ export class ExternalResponseMapper {
             checks: providerResult.document.validation_checks
               ? {
                   mrzValid: providerResult.document.validation_checks.mrz_valid,
-                  chipValid: providerResult.document.validation_checks.chip_valid,
-                  imageQuality:
-                    providerResult.document.validation_checks.image_quality,
-                  tamperDetection:
-                    providerResult.document.validation_checks.tamper_detection,
+                  chipValid: undefined,
+                  imageQuality: providerResult.document.validation_checks.image_quality,
+                  tamperDetection: providerResult.document.validation_checks.tamper_detection,
                 }
               : undefined,
           }
@@ -258,33 +255,39 @@ export class ExternalResponseMapper {
             livenessScore: providerResult.biometric.liveness_score,
           }
         : undefined,
-      additionalChecks: providerResult.checks
+      additionalChecks: providerResult.aml
         ? {
-            watchlist: providerResult.checks.watchlist
+            watchlist: providerResult.aml.watchlist_match
               ? {
-                  isMatch: providerResult.checks.watchlist.is_match,
-                  matches: providerResult.checks.watchlist.matches?.map((m) => ({
-                    listName: m.list_name,
-                    matchScore: m.match_score,
-                  })),
+                  isMatch: providerResult.aml.watchlist_match,
+                  matches: providerResult.aml.matches
+                    ?.filter((m) => m.match_type === 'watchlist')
+                    ?.map((m) => ({
+                      listName: m.list_name,
+                      matchScore: m.match_score,
+                    })),
                 }
               : undefined,
-            sanctions: providerResult.checks.sanctions
+            sanctions: providerResult.aml.sanctions_match
               ? {
-                  isMatch: providerResult.checks.sanctions.is_match,
-                  matches: providerResult.checks.sanctions.matches?.map((m) => ({
-                    listName: m.list_name,
-                    matchScore: m.match_score,
-                  })),
+                  isMatch: providerResult.aml.sanctions_match,
+                  matches: providerResult.aml.matches
+                    ?.filter((m) => m.match_type === 'sanctions')
+                    ?.map((m) => ({
+                      listName: m.list_name,
+                      matchScore: m.match_score,
+                    })),
                 }
               : undefined,
-            pep: providerResult.checks.pep
+            pep: providerResult.aml.pep_match
               ? {
-                  isMatch: providerResult.checks.pep.is_match,
-                  matches: providerResult.checks.pep.matches?.map((m) => ({
-                    name: m.name,
-                    matchScore: m.match_score,
-                  })),
+                  isMatch: providerResult.aml.pep_match,
+                  matches: providerResult.aml.matches
+                    ?.filter((m) => m.match_type === 'pep')
+                    ?.map((m) => ({
+                      name: m.entity_name,
+                      matchScore: m.match_score,
+                    })),
                 }
               : undefined,
           }
@@ -298,4 +301,3 @@ export class ExternalResponseMapper {
     };
   }
 }
-
